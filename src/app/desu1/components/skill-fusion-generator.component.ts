@@ -606,7 +606,6 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
         const startTime = performance.now();
         
         const results: DPFusionResult[] = [];
-        const seenHashes = new Map<string, DPFusionResult>();
         
         const ownedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
           const skills = [
@@ -623,16 +622,8 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
           const activeOwnedDemons = ignoreOwned ? [] : ownedDemons;
           const res = solver.solveMultiSkillFusion(this.targetDemonObj.name, reqSkills, this.playerMaxLevel, criteria, activeOwnedDemons);
           if (res) {
-            // Deduplicate by graph structure but merge labels
-            const hash = res.steps.map(s => s.result).join('|');
-            if (!seenHashes.has(hash)) {
-              res.label = labelName;
-              seenHashes.set(hash, res);
-              results.push(res);
-            } else {
-              const existing = seenHashes.get(hash)!;
-              existing.label += ' & ' + labelName;
-            }
+            res.label = labelName;
+            results.push(res);
           }
         };
 
