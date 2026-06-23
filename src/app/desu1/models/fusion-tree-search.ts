@@ -82,9 +82,12 @@ function isReachableBaseCase(demon: Demon, playerState: PlayerState): boolean {
   if (demon.lvl > playerState.maxLevel) return false;
   if (demon.fusion === 'story' && !playerState.unlockedFusions.includes(demon.name)) return false;
   if (demon.fusion === 'auction') {
-    const tier = detectDemonAHTier(demon) ?? 'basic';
-    const req = AH_TIER_REQUIREMENTS[tier];
-    if (playerState.currentDay < req.minDay) return false;
+    let requiredDay = AH_TIER_REQUIREMENTS[detectDemonAHTier(demon) ?? 'basic'].minDay;
+    if (demon.prereq) {
+      const m = demon.prereq.match(/Auction.*Day (\d+)/i);
+      if (m) requiredDay = Math.max(requiredDay, parseInt(m[1], 10));
+    }
+    if (playerState.currentDay < requiredDay) return false;
   }
   return true;
 }
@@ -427,7 +430,7 @@ function evaluateDemonReachability(demonName: string, demon: Demon, playerState:
   if (demon.lvl > playerState.maxLevel) {
     blockers.push({ type: 'level_too_low', detail: `${demonName} (Lv ${demon.lvl}) exceeds your level (${playerState.maxLevel})`, unlockCondition: `Reach Level ${demon.lvl}` });
   }
-  if (demon.fusion === 'story' || demon.prereq) {
+  if (demon.fusion === 'story') {
     const condition = demon.prereq || `Unlock ${demonName}`;
     if (!playerState.unlockedFusions.includes(demonName)) {
       blockers.push({ type: 'story_locked', detail: `${demonName} requires a story unlock: "${condition}"`, unlockCondition: condition });
@@ -455,7 +458,7 @@ function evaluateSkillReachability(skillName: string, demonName: string, demon: 
   let canBeInherited = true;
 
   if (skillLevel === undefined) {
-    return { skillName, onDemon: demonName, method: { type: 'innate' }, canBeInherited: false, isReachableNow: false, blockers: [{ type: 'story_locked', detail: `${skillName} not found on ${demonName}`, unlockCondition: '' }] };
+    return { skillName, onDemon: demonName, method: { type: 'fusion' }, canBeInherited: true, isReachableNow: true, blockers: [] };
   }
   if (isAHExclusiveSkill(skillLevel)) {
     canBeInherited = false;

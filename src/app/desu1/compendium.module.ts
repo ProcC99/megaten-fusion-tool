@@ -33,7 +33,7 @@ function estimateDesuPrice(demon, statPrices: number[], skillPrices: { [skill: s
   return statPrice + skillPrice + (demon.race === 'Element' ? 1000 : demon.race === 'Mitama' ? 3000 : 0);
 }
 
-function createCompConfig(): CompendiumConfigSet {
+export function createCompConfig(): CompendiumConfigSet {
   const races = COMP_CONFIG_JSON.races;
   const resistElems = COMP_CONFIG_JSON.resistElems;
   const skillElems = resistElems.concat(COMP_CONFIG_JSON.skillElems);
