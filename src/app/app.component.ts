@@ -6,21 +6,23 @@ import Translations from './compendium/data/translations.json';
   selector: 'app-root',
   template: `
     <div [ngClass]="currentGame">
-      <table style="margin-left: auto; margin-right: auto; width: 100%; max-width: 1080px;">
-        <thead>
-          <tr>
-            <th *ngFor="let link of msgs.HomeLink; index as i" [routerLink]="link" class="nav" routerLinkActive="active" [style.width]="navWidth">
-              <a [routerLink]="link">{{ msgs.Home[i] }}</a>
-            </th>
-            <th *ngFor="let link of otherLinks" class="nav external" [style.width]="navWidth">
-              <div><a [attr.href]="link.link">{{ link.title | translateComp:lang }}</a></div>
-            </th>
-          </tr>
-          <tr>
-            <th [attr.colspan]="msgs.HomeLink.length + otherLinks.length" class="title">{{ msgs.AppTitle | translateComp:lang }}</th>
-          </tr>
-        </thead>
-      </table>
+      <div style="width: 100%; overflow-x: auto;">
+        <table style="margin-left: auto; margin-right: auto; width: 100%; max-width: 1080px; min-width: 600px;">
+          <thead>
+            <tr>
+              <th *ngFor="let link of msgs.HomeLink; index as i" [routerLink]="link" class="nav" routerLinkActive="active" [style.width]="navWidth">
+                <a [routerLink]="link">{{ msgs.Home[i] }}</a>
+              </th>
+              <th *ngFor="let link of otherLinks" class="nav external" [style.width]="navWidth">
+                <div><a [attr.href]="link.link">{{ link.title | translateComp:lang }}</a></div>
+              </th>
+            </tr>
+            <tr>
+              <th [attr.colspan]="msgs.HomeLink.length + otherLinks.length" class="title">{{ msgs.AppTitle | translateComp:lang }}</th>
+            </tr>
+          </thead>
+        </table>
+      </div>
       <h4 *ngIf="loading" style="text-align: center;">{{ msgs.NowLoading | translateComp:lang }}</h4>
       <ng-container *ngIf="!loading">
         <router-outlet></router-outlet>
