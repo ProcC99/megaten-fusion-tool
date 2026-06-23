@@ -19,10 +19,6 @@ import { SmtFusionTableComponent }           from '../compendium/components/smt-
 import { SkillFusionGeneratorComponent } from './components/skill-fusion-generator.component';
 
 const compendiumRoutes: Routes = [
-  // Standalone page — must come BEFORE the catch-all and BEFORE the
-  // empty-path CompendiumComponent wrappers so it is matched directly.
-  { path: 'skill-recipe', component: SkillFusionGeneratorComponent },
-
   { path: '', redirectTo: 'demons', pathMatch: 'full' },
   {
     path: '',
@@ -33,6 +29,7 @@ const compendiumRoutes: Routes = [
     ]
   },
   {
+    // All content routes share the CompendiumComponent shell (nav header + router-outlet).
     path: '',
     component: CompendiumComponent,
     children: [
@@ -45,11 +42,14 @@ const compendiumRoutes: Routes = [
           { path: '**', redirectTo: 'fissions', pathMatch: 'full' }
         ]
       },
-      { path: 'demons',    component: DemonListContainerComponent },
-      { path: 'skills',    component: SkillListContainerComponent },
-      { path: 'recipes',   component: RecipeGeneratorContainerComponent },
-      { path: 'passwords', component: PasswordGeneratorContainerComponent },
-      { path: 'settings',  component: FusionSettingsContainerComponent },
+      { path: 'demons',       component: DemonListContainerComponent },
+      { path: 'skills',       component: SkillListContainerComponent },
+      { path: 'recipes',      component: RecipeGeneratorContainerComponent },
+      { path: 'passwords',    component: PasswordGeneratorContainerComponent },
+      { path: 'settings',     component: FusionSettingsContainerComponent },
+      // DSO-only: skill-targeted fusion recipe generator.
+      // Must be a child of CompendiumComponent so it renders inside its <router-outlet>.
+      { path: 'skill-recipe', component: SkillFusionGeneratorComponent },
     ]
   },
   { path: '**', redirectTo: 'demons', pathMatch: 'full' },
