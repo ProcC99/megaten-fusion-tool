@@ -6,22 +6,22 @@ import Translations from './compendium/data/translations.json';
   selector: 'app-root',
   template: `
     <div [ngClass]="currentGame">
-      <div style="width: 100%; overflow-x: auto;">
-        <table style="margin-left: auto; margin-right: auto; width: 100%; max-width: 1080px; min-width: 600px;">
-          <thead>
-            <tr>
-              <th *ngFor="let link of msgs.HomeLink; index as i" [routerLink]="link" class="nav" routerLinkActive="active" [style.width]="navWidth">
-                <a [routerLink]="link">{{ msgs.Home[i] }}</a>
-              </th>
-              <th *ngFor="let link of otherLinks" class="nav external" [style.width]="navWidth">
-                <div><a [attr.href]="link.link">{{ link.title | translateComp:lang }}</a></div>
-              </th>
-            </tr>
-            <tr>
-              <th [attr.colspan]="msgs.HomeLink.length + otherLinks.length" class="title">{{ msgs.AppTitle | translateComp:lang }}</th>
-            </tr>
-          </thead>
-        </table>
+      <div style="width: 100%; max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column;">
+        <div style="display: flex; flex-wrap: wrap; width: 100%;">
+          <div *ngFor="let link of msgs.HomeLink; index as i" 
+              [routerLink]="link" 
+              routerLinkActive="active" 
+              style="flex: 1 1 120px; text-align: center; background-color: #1b1b1b; border: 1px solid #333; padding: 8px 4px; cursor: pointer;">
+            <a [routerLink]="link" style="color: #66BBFF; text-decoration: none; font-weight: bold;">{{ msgs.Home[i] }}</a>
+          </div>
+          <div *ngFor="let link of otherLinks" 
+              style="flex: 1 1 120px; text-align: center; background-color: #1b1b1b; border: 1px solid #333; padding: 8px 4px;">
+            <a [attr.href]="link.link" style="color: #66BBFF; text-decoration: none; font-weight: bold;">{{ link.title | translateComp:lang }}</a>
+          </div>
+        </div>
+        <div style="width: 100%; text-align: center; background-color: white; color: black; font-weight: bold; padding: 6px 0; border: 1px solid #333;">
+          {{ msgs.AppTitle | translateComp:lang }}
+        </div>
       </div>
       <h4 *ngIf="loading" style="text-align: center;">{{ msgs.NowLoading | translateComp:lang }}</h4>
       <ng-container *ngIf="!loading">
