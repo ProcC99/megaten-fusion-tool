@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Devil Survivor Overclocked – Fusion Workbench</title>
+<title>DS:Overclocked – Fusion Recipe Generator</title>
 <style>
 :root{
   --bg:#0c0c0c;--panel:#151515;--panel2:#1b1b1b;--border:#2b2b2b;--text:#e5e5e5;--muted:#8b8b8b;
@@ -11,210 +11,221 @@
   --cmd:#7cc7ff;--pas:#9fd38d;--owned:#f4c84e;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,system-ui,sans-serif;font-size:14px;min-height:100vh}
-h1{color:var(--accent);text-align:center;padding:16px 0 4px;font-size:1.35rem;letter-spacing:.04em}
-.subtitle{text-align:center;color:var(--muted);margin-bottom:14px;font-size:.84rem}
-.app{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 74px)}
-@media(max-width:1100px){.app{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}}
-.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0}
-.main{padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.panel-head{padding:10px 12px;background:var(--panel2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.panel-title{font-size:.9rem;font-weight:800;color:var(--accent)}
-.panel-body{padding:12px}
-.small{font-size:.75rem;color:var(--muted)}
-.search{width:100%;background:#202020;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px}
-.search:focus,select:focus{outline:none;border-color:var(--accent)}
-select{background:#202020;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px}
-button{cursor:pointer;font:inherit}
-.btn{padding:7px 12px;border-radius:5px;border:none;font-weight:700}
+body{background:var(--bg);color:var(--text);font-family:Inter,'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh}
+h1{color:var(--accent);text-align:center;padding:16px 0 4px;font-size:1.3rem;letter-spacing:.04em}
+.subtitle{text-align:center;color:var(--muted);margin-bottom:12px;font-size:.82rem}
+.app{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 68px)}
+@media(max-width:960px){.app{grid-template-columns:1fr}}
+.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.main{padding:14px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+
+/* controls */
+.field{display:flex;flex-direction:column;gap:5px}
+.label{font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+input[type=text],select{background:#1e1e1e;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;width:100%;font:inherit}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+button{cursor:pointer;font:inherit;border:none}
+.btn{padding:7px 14px;border-radius:5px;font-weight:700;font-size:.82rem}
 .btn-primary{background:var(--accent);color:#111}
-.btn-primary:hover{filter:brightness(1.06)}
-.btn-secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 .btn-danger{background:transparent;border:1px solid #e05a5a44;color:var(--bad)}
 .btn-danger:hover{background:#e05a5a14}
-.btn-sm{padding:4px 8px;font-size:.77rem}
-.tabs{display:flex;gap:6px}
-.tab{flex:1;padding:7px 10px;border-radius:5px;border:1px solid var(--border);background:#1d1d1d;color:var(--muted);font-weight:700}
-.tab.active{color:var(--text);border-color:var(--accent);background:#241f11}
-.sidebar-section{display:none;min-height:0;flex:1}
-.sidebar-section.active{display:flex;flex-direction:column;gap:8px}
-.list{display:flex;flex-direction:column;gap:5px;overflow:auto;min-height:0}
-.demon-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;background:#121212;cursor:pointer}
+.btn-sm{padding:3px 8px;font-size:.74rem}
+.row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.toggle-wrap{display:flex;align-items:center;gap:8px;padding:6px 0}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#333;border-radius:22px;transition:.2s;cursor:pointer}
+.slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+input:checked+.slider{background:var(--accent)}
+input:checked+.slider:before{transform:translateX(18px)}
+
+/* sidebar list */
+.sb-search{display:flex;flex-direction:column;gap:6px}
+.sb-tabs{display:flex;gap:4px}
+.sb-tab{flex:1;padding:5px 8px;border-radius:4px;border:1px solid var(--border);background:#1d1d1d;color:var(--muted);font-weight:700;font-size:.78rem}
+.sb-tab.active{border-color:var(--accent);color:var(--text);background:#201c10}
+.demon-list{display:flex;flex-direction:column;gap:4px;overflow:auto;flex:1;min-height:0}
+.demon-row{display:flex;align-items:center;gap:7px;padding:6px 7px;border:1px solid var(--border);border-radius:5px;background:#111;cursor:pointer;flex-shrink:0}
 .demon-row:hover{background:#181818}
-.demon-row.selected{border-color:var(--accent2);background:#10161d}
-.star{width:20px;text-align:center;color:#555;font-size:1rem;cursor:pointer;flex-shrink:0}
-.star.owned{color:var(--owned)}
-.demon-meta{display:flex;flex-direction:column;min-width:0;flex:1}
-.demon-name{font-weight:700;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.demon-sub{font-size:.72rem;color:var(--muted)}
-.badge{padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-size:.7rem;color:var(--muted);background:#1d1d1d}
+.star{color:#444;font-size:.95rem;cursor:pointer;flex-shrink:0;user-select:none;line-height:1}
+.star.on{color:var(--owned)}
+.d-meta{flex:1;min-width:0}
+.d-name{font-weight:700;font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.d-sub{font-size:.7rem;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-size:.68rem;color:var(--muted);background:#1c1c1c;white-space:nowrap}
+.badge.good{border-color:#1c402e;color:var(--good);background:#0b1f14}
+.badge.bad{border-color:#3e1c1c;color:var(--bad);background:#1f0b0b}
+.badge.warn{border-color:#3e3112;color:var(--warn);background:#1f180a}
+
+/* panel */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.panel-head{padding:10px 12px;background:var(--panel2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.panel-title{font-size:.88rem;font-weight:800;color:var(--accent)}
+.panel-body{padding:12px}
+.note{font-size:.76rem;color:var(--muted);padding:7px 9px;border:1px dashed var(--border);border-radius:5px;background:#0f0f0f}
+
+/* skill selector */
+.skill-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:700px){.skill-cols{grid-template-columns:1fr}}
+.skill-box{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#111}
+.skill-box-head{padding:7px 9px;font-size:.73rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+.skill-box-head.cmd{background:#0d1e2e;color:var(--cmd);border-bottom-color:#1b3347}
+.skill-box-head.pas{background:#111e11;color:var(--pas);border-bottom-color:#1e3120}
+.skill-pool{padding:6px;display:flex;flex-direction:column;gap:4px;max-height:240px;overflow:auto}
+.skill-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 7px;border:1px solid var(--border);border-radius:5px;background:#0f0f0f;cursor:pointer;font-size:.8rem}
+.skill-row:hover{background:#181818}
+.skill-row.selected{border-color:var(--accent);background:#1a1500}
+.skill-name{font-weight:600}
+.skill-source{font-size:.69rem;color:var(--muted)}
+.slot-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.slot-pill{padding:4px 9px;border-radius:999px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:#161616}
+.slot-pill.cmd{border-color:#1b3347;color:var(--cmd)}
+.slot-pill.pas{border-color:#1e3120;color:var(--pas)}
+.slot-pill:hover{filter:brightness(1.2)}
+
+/* result */
+.result-panel{border:1px solid var(--border);border-radius:7px;background:#0f0f0f;overflow:hidden}
+.result-head{padding:10px 12px;background:#191919;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.result-title{font-weight:800;font-size:.95rem;color:var(--good)}
+.result-body{padding:12px;display:flex;flex-direction:column;gap:10px}
+.failure-panel{border:1px solid #3e1c1c;border-radius:7px;background:#140a0a;padding:12px;display:flex;flex-direction:column;gap:6px}
+.failure-title{font-weight:800;color:var(--bad);font-size:.88rem}
+.failure-reasons{display:flex;flex-direction:column;gap:5px}
+.failure-reason{padding:6px 8px;border-left:3px solid var(--bad);background:#1a0c0c;border-radius:3px;font-size:.8rem}
+.chain-steps{display:flex;flex-direction:column;gap:8px}
+.step-card{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#111}
+.step-head{padding:8px 10px;background:#181818;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.step-head:hover{background:#1d1d1d}
+.step-main{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}
+.step-arrow{color:var(--accent);font-weight:900}
+.step-body{display:none;padding:10px;border-top:1px solid var(--border)}
+.step-body.open{display:block}
+
+/* demon card */
+.demon-card{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#111}
+.demon-card-head{padding:8px 10px;background:#191919;display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer}
+.demon-card-head:hover{background:#1e1e1e}
+.demon-card-body{display:none;padding:10px;border-top:1px solid var(--border)}
+.demon-card-body.open{display:block}
+.dc-title{font-weight:800;color:var(--accent);font-size:.88rem}
+.stats-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.stat-chip{min-width:36px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:#181818;text-align:center;font-size:.72rem}
+.stat-chip span{display:block;color:var(--muted);font-size:.63rem}
+.resists-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px}
+.res-chip{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:5px;border:1px solid var(--border);background:#161616;font-size:.74rem;gap:4px}
+.res-chip.weak{border-color:#5a2020;color:#ff8d8d;background:#1e0e0e}
+.res-chip.resist{border-color:#1a4030;color:#88ddb7;background:#0b1a14}
+.res-chip.special{border-color:#1a2e50;color:#8ec0ff;background:#0b141f}
+.res-chip.normal{color:var(--muted)}
+.skills-split{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:700px){.skills-split{grid-template-columns:1fr}}
+.sk-box{border:1px solid var(--border);border-radius:5px;overflow:hidden}
+.sk-head{padding:6px 8px;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.sk-head.cmd{background:#0d1e2e;color:var(--cmd);border-bottom:1px solid #1b3347}
+.sk-head.pas{background:#111e11;color:var(--pas);border-bottom:1px solid #1e3120}
+.sk-body{padding:6px;display:flex;flex-direction:column;gap:4px}
+.sk-slot{display:flex;align-items:center;gap:6px;padding:5px 7px;border:1px solid var(--border);border-radius:4px;background:#0f0f0f;font-size:.79rem}
+.sk-slot.empty{color:#555;border-style:dashed}
+.sk-pill{font-size:.6rem;padding:1px 5px;border-radius:999px;border:1px solid currentColor}
+.sk-pill.cmd{color:var(--cmd)}
+.sk-pill.pas{color:var(--pas)}
+.sk-pill.wanted{color:var(--accent);border-color:var(--accent)}
+.sk-right{font-size:.69rem;color:var(--muted);margin-left:auto}
+
+/* misc */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media(max-width:900px){.grid2{grid-template-columns:1fr}}
-.workbench-row{display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:end}
-@media(max-width:900px){.workbench-row{grid-template-columns:1fr}.workbench-arrow,.workbench-eq{display:none}}
-.field{display:flex;flex-direction:column;gap:5px}
-.label{font-size:.75rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
-.result-box{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px;border:1px dashed var(--border);border-radius:6px;background:#101010;min-height:44px}
-.result-name{font-weight:800;color:var(--good)}
-.inline-actions{display:flex;gap:8px;flex-wrap:wrap}
-.compact-card{border:1px solid var(--border);border-radius:7px;background:#111;overflow:hidden}
-.compact-head{padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#171717;cursor:pointer}
-.compact-head:hover{background:#1c1c1c}
-.compact-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
-.compact-title{font-weight:800;color:var(--accent);font-size:.9rem}
-.compact-body{display:none;padding:10px;border-top:1px solid var(--border)}
-.compact-body.open{display:block}
-.stats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.stat{min-width:38px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:#171717;text-align:center;font-size:.73rem}
-.stat span{display:block;color:var(--muted);font-size:.65rem}
-.resists{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
-@media(max-width:700px){.resists{grid-template-columns:repeat(2,1fr)}}
-.res-chip{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:5px;border:1px solid var(--border);background:#171717;font-size:.75rem}
-.res-chip.bad{border-color:#5a2020;color:#ff8d8d;background:#221414}
-.res-chip.good{border-color:#1f4f3e;color:#88deb7;background:#102019}
-.res-chip.neutral{color:var(--muted)}
-.res-chip.special{border-color:#233a57;color:#8ec0ff;background:#101a24}
-.skill-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media(max-width:800px){.skill-columns{grid-template-columns:1fr}}
-.skill-box{border:1px solid var(--border);border-radius:6px;background:#141414;overflow:hidden}
-.skill-head{padding:7px 9px;font-size:.74rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
-.skill-head.cmd{background:#0e2030;color:var(--cmd);border-bottom:1px solid #24445f}
-.skill-head.pas{background:#132314;color:var(--pas);border-bottom:1px solid #335436}
-.skill-list{padding:8px;display:flex;flex-direction:column;gap:5px}
-.skill-slot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:#101010;font-size:.8rem}
-.skill-slot.empty{color:#666;border-style:dashed}
-.skill-slot.owned-edit{cursor:pointer}
-.skill-left{display:flex;align-items:center;gap:6px;min-width:0}
-.skill-type-pill{font-size:.62rem;padding:1px 5px;border-radius:999px;border:1px solid currentColor;opacity:.9}
-.skill-type-pill.cmd{color:var(--cmd)}
-.skill-type-pill.pas{color:var(--pas)}
-.skill-note{font-size:.7rem;color:var(--muted);flex-shrink:0}
-.chain{display:flex;flex-direction:column;gap:8px}
-.chain-item{border:1px solid var(--border);border-radius:7px;background:#111;overflow:hidden}
-.chain-summary{padding:8px 10px;background:#171717;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
-.chain-summary:hover{background:#1c1c1c}
-.chain-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
-.chain-body{display:none;padding:10px;border-top:1px solid var(--border)}
-.chain-body.open{display:block}
-.arrow{color:var(--accent);font-weight:900}
-.modal-overlay{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:100}
-.modal-overlay.open{display:flex}
-.modal{width:520px;max-width:96vw;max-height:84vh;background:#161616;border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
-.modal-head{padding:10px 12px;background:#1e1e1e;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.modal-body{padding:10px;display:flex;flex-direction:column;gap:8px;overflow:auto}
-.skill-pick{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;background:#111;cursor:pointer}
-.skill-pick:hover{background:#171717}
-.help{padding:8px 10px;border:1px dashed var(--border);border-radius:6px;background:#111;color:var(--muted);font-size:.78rem}
-.toast{position:fixed;right:18px;bottom:18px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:#202020;color:var(--text);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:120}
-.toast.show{opacity:1;transform:translateY(0)}
-.empty{padding:18px;text-align:center;color:var(--muted)}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.empty{padding:20px;text-align:center;color:var(--muted);font-size:.84rem}
+.toast{position:fixed;right:16px;bottom:16px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:#202020;color:var(--text);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:200}
+.toast.show{opacity:1;transform:none}
 </style>
 </head>
 <body>
-<h1>⚔ Devil Survivor Overclocked – Fusion Workbench</h1>
-<p class="subtitle">Pick the demons you own, calculate outcomes, then add only the results you want into a fusion chain.</p>
+<h1>⚔ DS:Overclocked – Fusion Recipe Generator</h1>
+<p class="subtitle">Select your target demon and desired skills → generate the fusion recipe that gets you there.</p>
 
 <div class="app">
+  <!-- SIDEBAR -->
   <aside class="sidebar">
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('compendium', this)">My Compendium</button>
-      <button class="tab" onclick="switchTab('all', this)">All Demons</button>
+    <div class="sb-search">
+      <div class="sb-tabs">
+        <button class="sb-tab active" id="tabOwned" onclick="sbTab('owned')">Owned ★</button>
+        <button class="sb-tab" id="tabAll" onclick="sbTab('all')">All Demons</button>
+      </div>
+      <input id="sbSearch" type="text" placeholder="Search…" oninput="renderSidebar()"/>
+      <select id="sbRace" onchange="renderSidebar()"><option value="">All Races</option></select>
     </div>
-
-    <div id="tab-compendium" class="sidebar-section active">
-      <input id="ownedSearch" class="search" placeholder="Search owned demons…" oninput="renderSidebar()"/>
-      <div class="help">Click ★ to mark demons you own. Click the demon row to review it or edit its current skills.</div>
-      <div id="ownedList" class="list"></div>
-    </div>
-
-    <div id="tab-all" class="sidebar-section">
-      <input id="allSearch" class="search" placeholder="Search all demons…" oninput="renderSidebar()"/>
-      <select id="raceFilter" onchange="renderSidebar()"><option value="">All Races</option></select>
-      <div class="help">This dataset is still incomplete, but the UI no longer assumes the listed demons are the full Overclocked compendium.</div>
-      <div id="allList" class="list"></div>
-    </div>
+    <div class="note">★ marks demons you own. Owned demons are preferred by the solver as material demons.</div>
+    <div id="demonList" class="demon-list"></div>
   </aside>
 
+  <!-- MAIN -->
   <main class="main">
+
+    <!-- TARGET SETUP -->
     <section class="panel">
       <div class="panel-head">
         <div>
-          <div class="panel-title">Fusion Workbench</div>
-          <div class="small">Primary flow: choose two material demons → calculate → inspect result → optionally add to chain.</div>
+          <div class="panel-title">1 · Target Demon &amp; Desired Skills</div>
+          <div class="note" style="margin-top:4px;border:none;padding:0">Pick the demon you want to fuse toward, then choose up to 3 CMD and 3 PAS skills.</div>
         </div>
-        <div class="inline-actions">
-          <button class="btn btn-secondary btn-sm" onclick="swapParents()">Swap Parents</button>
-          <button class="btn btn-danger btn-sm" onclick="clearWorkbench()">Clear</button>
-        </div>
+        <button class="btn btn-danger btn-sm" onclick="resetTarget()">Reset</button>
       </div>
       <div class="panel-body">
-        <div class="workbench-row">
-          <div class="field">
-            <div class="label">Parent A</div>
-            <select id="parentA"></select>
+        <div class="row" style="margin-bottom:12px">
+          <div class="field" style="flex:1">
+            <div class="label">Target demon</div>
+            <select id="targetSelect" onchange="onTargetChange()"><option value="">— Choose target —</option></select>
           </div>
-          <div class="workbench-arrow arrow">×</div>
-          <div class="field">
-            <div class="label">Parent B</div>
-            <select id="parentB"></select>
+          <div class="toggle-wrap">
+            <label class="toggle"><input type="checkbox" id="strictToggle"/><span class="slider"></span></label>
+            <span style="font-size:.8rem">Strict mode</span>
           </div>
-          <div><button class="btn btn-primary" onclick="calculateFusion()">Calculate</button></div>
         </div>
-
-        <div style="height:12px"></div>
-
-        <div class="grid2">
-          <div>
-            <div id="parentCards" class="empty">Select two parent demons to inspect what they contribute.</div>
-          </div>
-          <div>
-            <div class="field" style="margin-bottom:8px">
-              <div class="label">Fusion Result</div>
-              <div id="resultBox" class="result-box"><span class="small">No result yet.</span></div>
+        <div id="skillSelector" style="display:none">
+          <div class="skill-cols">
+            <div class="skill-box">
+              <div class="skill-box-head cmd">Command skills — <span id="cmdCount">0</span>/3 selected</div>
+              <div class="skill-pool" id="cmdPool"></div>
             </div>
-            <div id="resultDetails"></div>
+            <div class="skill-box">
+              <div class="skill-box-head pas">Passive skills — <span id="pasCount">0</span>/3 selected</div>
+              <div class="skill-pool" id="pasPool"></div>
+            </div>
+          </div>
+          <div style="margin-top:8px">
+            <div class="label">Desired skills (click to remove)</div>
+            <div id="selectedSkills" class="slot-strip"></div>
           </div>
         </div>
+        <div id="targetCard" style="margin-top:10px"></div>
       </div>
     </section>
 
+    <!-- GENERATE -->
     <section class="panel">
       <div class="panel-head">
-        <div>
-          <div class="panel-title">Fusion Chain</div>
-          <div class="small">This is optional. Only calculated results you accept are added here.</div>
-        </div>
-        <div class="inline-actions">
-          <button class="btn btn-secondary btn-sm" onclick="copyChain()">Copy Summary</button>
-          <button class="btn btn-danger btn-sm" onclick="clearChain()">Clear Chain</button>
-        </div>
+        <div class="panel-title">2 · Generate Recipe</div>
       </div>
       <div class="panel-body">
-        <div id="chainList" class="chain"></div>
+        <div class="row">
+          <button class="btn btn-primary" onclick="generateRecipe()">Generate Recipe</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyResult()">Copy Summary</button>
+        </div>
+        <div id="recipeOutput" style="margin-top:12px"></div>
       </div>
     </section>
-  </main>
-</div>
 
-<div id="skillModal" class="modal-overlay">
-  <div class="modal">
-    <div class="modal-head">
-      <strong id="skillModalTitle">Edit Skills</strong>
-      <button class="btn btn-secondary btn-sm" onclick="closeSkillModal()">Close</button>
-    </div>
-    <div class="modal-body">
-      <input id="skillSearch" class="search" placeholder="Search skills…" oninput="renderSkillModal()"/>
-      <div class="help">You are editing the skills on the demon you currently own. Command and passive slots are separate here to match the game's mental model.</div>
-      <div id="skillModalContent"></div>
-    </div>
-  </div>
+  </main>
 </div>
 
 <div id="toast" class="toast"></div>
 
 <script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
 const DEMONS = {
   "Pixie":{"lvl":2,"race":"Fairy","resists":"-w-s--","skills":{"Dia":0.1,"Charm":0.2,"Zio":4},"stats":[0,30,27,3,7,4,4]},
   "Kobold":{"lvl":3,"race":"Touki","resists":"-w---w","skills":{"Aggravate":0.1,"Hero Aid":5},"stats":[0,48,12,4,3,5,7]},
@@ -279,356 +290,509 @@ const CMD_SKILLS = new Set([
   'Agi','Bufu','Zio','Zan','Maragi','Mabufu','Mazio','Mazan','Agidyne','Bufudyne','Ziodyne','Zandyne','Maragidyne',
   'Dia','Media','Diarahan','Mediarahan','Recarm','Amrita','Tarukaja','Rakukaja','Sukukaja','Dekaja','Dekunda',
   'Fire Dance','Ice Dance','Elec Dance','Force Dance','Berserk','Anger Hit','Race-D','Race-O','Switch','Sacrifice',
-  'Bind','Charm','+Paralyze','+Mute','+Poison','Dormina','Drain','Diajama','Gigajama','Makajamaon','Poisma','Blood Wine',
-  'Chaos Wave','Weak Kill','Shield All','Tyranny','Devotion','Affection','Desperation','Knight Soul','Phantasma','Mute Eyes','Paral Eyes'
+  'Bind','Charm','+Paralyze','+Mute','+Poison','Dormina','Drain','Diajama','Gigajama','Makajamaon','Poisma',
+  'Blood Wine','Chaos Wave','Weak Kill','Shield All','Tyranny','Devotion','Affection','Desperation',
+  'Knight Soul','Phantasma','Mute Eyes','Paral Eyes'
 ]);
 
-const ALL_SKILLS = [...new Set(Object.values(DEMONS).flatMap(d=>Object.keys(d.skills)).concat([
-  'Agi','Bufu','Zio','Zan','Maragi','Mabufu','Mazio','Mazan','Agidyne','Bufudyne','Ziodyne','Zandyne','Maragidyne',
-  'Dia','Media','Diarahan','Mediarahan','Recarm','Amrita','Tarukaja','Rakukaja','Sukukaja','Dekaja','Dekunda','Fire Dance',
-  'Ice Dance','Elec Dance','Force Dance','Mana Bonus','Life Bonus','Mana Surge','Life Aid','Phys Boost','Fire Boost','Ice Boost',
-  'Elec Boost','Force Boost','Fire Amp','Ice Amp','Elec Amp','Force Amp','Pierce','Counter','Retaliate','Hero Aid','Hero Soul',
-  'Watchful','Aggravate','Animal Leg','Devil Speed','Flight','Awakening','Null Curse','Anti-Curse','Anti-Elec','Anti-Force',
-  'Elec Repel','Phys Repel'
-]))].sort();
+const ALL_SKILLS = [...new Set(
+  Object.values(DEMONS).flatMap(d=>Object.keys(d.skills)).concat([
+    'Agi','Bufu','Zio','Zan','Maragi','Mabufu','Mazio','Mazan','Agidyne','Bufudyne','Ziodyne','Zandyne','Maragidyne',
+    'Dia','Media','Diarahan','Mediarahan','Recarm','Amrita','Tarukaja','Rakukaja','Sukukaja','Dekaja','Dekunda',
+    'Fire Dance','Ice Dance','Elec Dance','Force Dance',
+    'Mana Bonus','Life Bonus','Mana Surge','Life Aid','Phys Boost','Fire Boost','Ice Boost','Elec Boost','Force Boost',
+    'Fire Amp','Ice Amp','Elec Amp','Force Amp','Pierce','Counter','Retaliate','Hero Aid','Hero Soul',
+    'Watchful','Aggravate','Animal Leg','Devil Speed','Flight','Awakening',
+    'Null Curse','Anti-Curse','Anti-Elec','Anti-Force','Elec Repel','Phys Repel'
+  ])
+)].sort();
 
-const RES_NAMES = ['Phys','Fire','Ice','Elec','Force','Curse'];
-const RES_SHOW = {'-':'—','w':'Weak','s':'Resist','n':'Null','d':'Drain','r':'Repel'};
+const RES_NAMES=['Phys','Fire','Ice','Elec','Force','Curse'];
+const RES_SHOW={'-':'Normal','w':'Weak','s':'Resist','n':'Null','d':'Drain','r':'Repel'};
+const RES_CLASS={'-':'normal','w':'weak','s':'resist','n':'special','d':'special','r':'special'};
+const STAT_LABELS=['Str','HP','MP','St','Ma','Vi','Ag'];
 
-let appState = {
-  tab:'compendium',
-  selectedSidebarDemon:null,
-  owned:{},
-  parentA:'',
-  parentB:'',
-  lastCalc:null,
-  chain:[],
-  editingDemon:null
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  sbTab:'owned',
+  owned:{},          // name -> {owned:bool, skills:[...up to 6]}
+  target:'',
+  desiredSkills:[],  // [{name,type}]
+  lastResult:null
 };
 
-function isCmd(skill){ return CMD_SKILLS.has(skill); }
-function getSkillEntries(name){
-  const d = DEMONS[name];
-  return Object.entries(d.skills).map(([skill,lvl])=>({skill,lvl,type:isCmd(skill)?'cmd':'pas'}));
-}
-function baseActiveSkills(name){ return getSkillEntries(name).filter(s=>s.lvl < 1).map(s=>s.skill); }
-function baseLearnedSkills(name){ return getSkillEntries(name).filter(s=>s.lvl >= 1).map(s=>s.skill); }
-function ensureOwnedState(name){
-  if(!appState.owned[name]){
-    const base = [...baseActiveSkills(name), ...baseLearnedSkills(name)];
-    appState.owned[name] = {owned:false, extraSkills:[], currentSkills:[...new Set(base)]};
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const isCmd = s => CMD_SKILLS.has(s);
+const skType = s => isCmd(s)?'cmd':'pas';
+const demonNames = Object.keys(DEMONS).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
+const getRace = n => DEMONS[n].race;
+const allSkillsOf = n => Object.keys(DEMONS[n].skills);
+
+function ensureOwned(name){
+  if(!S.owned[name]){
+    S.owned[name]={owned:false,skills:[...allSkillsOf(name)].slice(0,6)};
   }
-  return appState.owned[name];
+  return S.owned[name];
 }
-function currentSkills(name){
-  const st = ensureOwnedState(name);
-  return [...new Set(st.currentSkills)];
+function isOwned(name){ return ensureOwned(name).owned; }
+function ownedSkills(name){
+  const st=ensureOwned(name);
+  return st.skills.filter(s=>!!s);
 }
-function splitSkills(skills){
-  const cmd = skills.filter(isCmd).slice(0,3);
-  const pas = skills.filter(s=>!isCmd(s)).slice(0,3);
-  return {cmd,pas};
+function skillsForSolver(name){
+  // returns all skills this demon can contribute (owned skills or base skills)
+  if(isOwned(name)) return ownedSkills(name);
+  return allSkillsOf(name);
 }
-function getResClass(c){
-  if(c==='w') return 'bad';
-  if(c==='s') return 'good';
-  if(c==='n'||c==='d'||c==='r') return 'special';
-  return 'neutral';
-}
-function switchTab(tab, btn){
-  appState.tab = tab;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('.sidebar-section').forEach(s=>s.classList.remove('active'));
-  document.getElementById('tab-'+tab).classList.add('active');
-  renderSidebar();
-}
-function toast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),2200);
-}
-function init(){
-  const races=[...new Set(Object.values(DEMONS).map(d=>d.race))].sort();
-  const rf=document.getElementById('raceFilter');
-  races.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;rf.appendChild(o);});
-  Object.keys(DEMONS).forEach(ensureOwnedState);
-  renderSidebar();
-  populateParentSelectors();
-  renderWorkbench();
-  renderChain();
-}
-function renderSidebar(){
-  renderOwnedList();
-  renderAllList();
-}
-function demonMatches(name, search, race){
-  const d = DEMONS[name];
-  return name.toLowerCase().includes(search.toLowerCase()) && (!race || d.race===race);
-}
-function demonRow(name, showOnlyOwned=false){
-  const d = DEMONS[name];
-  const st = ensureOwnedState(name);
-  if(showOnlyOwned && !st.owned) return '';
-  return `<div class="demon-row ${appState.selectedSidebarDemon===name?'selected':''}" onclick="selectSidebarDemon('${esc(name)}')">
-    <span class="star ${st.owned?'owned':''}" onclick="event.stopPropagation();toggleOwned('${esc(name)}')">★</span>
-    <div class="demon-meta">
-      <div class="demon-name">${name}</div>
-      <div class="demon-sub">Lv${d.lvl} · ${d.race}</div>
-    </div>
-    ${st.owned?'<span class="badge">Owned</span>':''}
-  </div>`;
-}
-function renderOwnedList(){
-  const q=document.getElementById('ownedSearch').value||'';
-  const ownedNames=Object.keys(DEMONS).filter(n=>ensureOwnedState(n).owned && demonMatches(n,q,''));
-  document.getElementById('ownedList').innerHTML = ownedNames.length ? ownedNames.sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl).map(n=>demonRow(n,true)).join('') : '<div class="empty">No owned demons match. Click ★ in All Demons to add some.</div>';
-}
-function renderAllList(){
-  const q=document.getElementById('allSearch').value||'';
-  const race=document.getElementById('raceFilter').value||'';
-  const names=Object.keys(DEMONS).filter(n=>demonMatches(n,q,race)).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
-  document.getElementById('allList').innerHTML = names.map(n=>demonRow(n,false)).join('');
-}
-function toggleOwned(name){
-  const st=ensureOwnedState(name);st.owned=!st.owned;
-  populateParentSelectors();renderSidebar();
-  toast(st.owned?`${name} added to My Compendium`:`${name} removed from My Compendium`);
-}
-function selectSidebarDemon(name){
-  appState.selectedSidebarDemon=name;renderSidebar();
-  appState.editingDemon=name;
-  openSkillModal(name);
-}
-function populateParentSelectors(){
-  const owned=Object.keys(DEMONS).filter(n=>ensureOwnedState(n).owned).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
-  const pool = owned.length ? owned : Object.keys(DEMONS).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
-  ['parentA','parentB'].forEach(id=>{
-    const sel=document.getElementById(id); const current = appState[id];
-    sel.innerHTML='<option value="">— Select demon —</option>';
-    pool.forEach(name=>{
-      const d=DEMONS[name]; const o=document.createElement('option');
-      o.value=name; o.textContent=`${name} (Lv${d.lvl} ${d.race})${ensureOwnedState(name).owned?' ★':''}`;
-      sel.appendChild(o);
-    });
-    sel.value=current||'';
-    sel.onchange=()=>{appState[id]=sel.value;renderWorkbench();};
-  });
-}
-function swapParents(){
-  const a=appState.parentA,b=appState.parentB;appState.parentA=b;appState.parentB=a;populateParentSelectors();renderWorkbench();
-}
-function clearWorkbench(){
-  appState.parentA='';appState.parentB='';appState.lastCalc=null;populateParentSelectors();renderWorkbench();
-}
-function renderWorkbench(){
-  const a=appState.parentA,b=appState.parentB;
-  const parentCards=document.getElementById('parentCards');
-  const resultBox=document.getElementById('resultBox');
-  const resultDetails=document.getElementById('resultDetails');
-  if(!a && !b){
-    parentCards.innerHTML='<div class="empty">Select two parent demons. Owned demons appear in the dropdowns first once you mark them in My Compendium.</div>';
-  }else{
-    parentCards.innerHTML = [a,b].filter(Boolean).map((name,idx)=>compactCard(name, currentSkills(name), `Parent ${idx===0?'A':'B'}`)).join('');
-  }
-  if(!appState.lastCalc){
-    resultBox.innerHTML='<span class="small">No result yet.</span>';
-    resultDetails.innerHTML='';
-  }else{
-    const r=appState.lastCalc;
-    resultBox.innerHTML = r.error ? `<span style="color:var(--bad);font-weight:800">${r.error}</span>` : `<span class="result-name">${r.result}</span><span class="badge">${r.resultRace}</span><span class="small">Average level ${r.avgLvl}</span><button class="btn btn-primary btn-sm" onclick="addResultToChain()">Add to Chain</button>`;
-    resultDetails.innerHTML = r.error ? '' : `<div style="margin-top:8px">${compactCard(r.result, r.previewSkills, 'Calculated Result', true)}</div><div class="help" style="margin-top:8px">Preview uses both parents' current skills, then applies command/passive slot caps separately (3 command + 3 passive shown).</div>`;
-  }
-}
+
 function getFusionRace(rA,rB){
   const k1=`${rA}+${rB}`,k2=`${rB}+${rA}`;
   if(k1 in FUSION_TABLE) return FUSION_TABLE[k1];
   if(k2 in FUSION_TABLE) return FUSION_TABLE[k2];
   return undefined;
 }
-function calculateFusion(){
-  const a=appState.parentA,b=appState.parentB;
-  if(!a||!b){ toast('Pick both parent demons first'); return; }
-  if(a===b){ appState.lastCalc={error:'You cannot fuse a demon with itself.'}; renderWorkbench(); return; }
-  const dA=DEMONS[a], dB=DEMONS[b];
-  const race = getFusionRace(dA.race,dB.race);
-  if(race===undefined){ appState.lastCalc={error:'This race combination is not in the current fusion table subset.'}; renderWorkbench(); return; }
-  if(race===null){ appState.lastCalc={error:'Same-race / special fusion path is not handled in this build yet.'}; renderWorkbench(); return; }
-  const avgLvl=Math.floor((dA.lvl+dB.lvl)/2);
-  const candidates=Object.entries(DEMONS).filter(([n,d])=>d.race===race&&n!==a&&n!==b).sort(([,x],[,y])=>x.lvl-y.lvl);
+
+// Find all (raceA, raceB) pairs that produce targetRace
+function parentRacePairs(targetRace){
+  const pairs=[];
+  const races=[...new Set(Object.values(DEMONS).map(d=>d.race))];
+  for(let i=0;i<races.length;i++){
+    for(let j=i;j<races.length;j++){
+      const r=getFusionRace(races[i],races[j]);
+      if(r===targetRace) pairs.push([races[i],races[j]]);
+    }
+  }
+  return pairs;
+}
+
+// Given two parents, predict result name using level-average lookup
+function predictResult(nameA,nameB){
+  const dA=DEMONS[nameA],dB=DEMONS[nameB];
+  const race=getFusionRace(dA.race,dB.race);
+  if(!race) return null;
+  const avg=Math.floor((dA.lvl+dB.lvl)/2);
+  const cands=Object.entries(DEMONS)
+    .filter(([n,d])=>d.race===race&&n!==nameA&&n!==nameB)
+    .sort(([,a],[,b])=>a.lvl-b.lvl);
   let best=null;
-  for(const [n,d] of candidates){ if(d.lvl>=avgLvl){ best=[n,d]; break; } }
-  if(!best && candidates.length) best=candidates[candidates.length-1];
-  if(!best){ appState.lastCalc={error:`Would produce ${race}, but no demon of that race exists in the current dataset.`}; renderWorkbench(); return; }
-  const [resultName,resultData]=best;
-  const pool=[...new Set([...currentSkills(a),...currentSkills(b),...baseActiveSkills(resultName),...baseLearnedSkills(resultName)])];
-  const cmd=pool.filter(isCmd).slice(0,3);
-  const pas=pool.filter(s=>!isCmd(s)).slice(0,3);
-  appState.lastCalc={
-    parentA:a,parentB:b,result:resultName,resultRace:race,avgLvl,
-    previewSkills:[...cmd,...pas]
+  for(const [n,d] of cands){ if(d.lvl>=avg){best=n;break;} }
+  if(!best&&cands.length) best=cands[cands.length-1][0];
+  return best;
+}
+
+// ─── SOLVER ──────────────────────────────────────────────────────────────────
+// Returns {ok, steps, missing, reasons}
+function solve(targetName, desiredSkills, strict){
+  const reasons=[];
+  const td=DEMONS[targetName];
+  if(!td){ return {ok:false,reasons:['Target demon not found in dataset.']}; }
+
+  const targetRace=td.race;
+  const ownedSet=new Set(Object.keys(S.owned).filter(n=>S.owned[n]&&S.owned[n].owned));
+
+  // All skills innate to the target
+  const targetInnate=new Set(allSkillsOf(targetName));
+  // Desired skills that are NOT innate (need to be carried in)
+  const toInherit=desiredSkills.filter(s=>!targetInnate.has(s));
+  const alreadyHave=desiredSkills.filter(s=>targetInnate.has(s));
+
+  // Find parent race pairs that produce targetRace
+  const pairs=parentRacePairs(targetRace);
+  if(!pairs.length){
+    reasons.push(`No race combination in the current table produces the ${targetRace} race.`);
+    reasons.push('The dataset may be incomplete. This race might only be reachable via special fusion.');
+    return {ok:false,reasons};
+  }
+
+  // For each desired inherited skill, check if ANY demon in the dataset has it
+  const skillDemonMap={}; // skill -> [demonNames that have it]
+  for(const sk of toInherit){
+    skillDemonMap[sk]=Object.keys(DEMONS).filter(n=>allSkillsOf(n).includes(sk));
+    if(!skillDemonMap[sk].length){
+      reasons.push(`"${sk}" is not found on any demon in the current dataset — cannot inherit.`);
+    }
+  }
+
+  // Separate CMD/PAS for slot cap check
+  const wantCmd=desiredSkills.filter(isCmd);
+  const wantPas=desiredSkills.filter(s=>!isCmd(s));
+  if(wantCmd.length>3) reasons.push(`You selected ${wantCmd.length} command skills but only 3 command slots exist.`);
+  if(wantPas.length>3) reasons.push(`You selected ${wantPas.length} passive skills but only 3 passive slots exist.`);
+
+  if(strict && reasons.length) return {ok:false,reasons};
+
+  // Try to find a good single-step recipe:
+  // Two parents whose combined skills cover as many desired inherited skills as possible
+  // Preference: at least one parent is owned
+  let bestPlan=null;
+  let bestScore=-1;
+
+  for(const [rA,rB] of pairs){
+    const demonsA=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rA&&n!==targetName);
+    const demonsB=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rB&&n!==targetName);
+
+    for(const pA of demonsA){
+      for(const pB of demonsB){
+        if(pA===pB) continue;
+        const predicted=predictResult(pA,pB);
+        if(!predicted || predicted!==targetName) continue; // must resolve to target
+
+        const poolSkills=[...new Set([...skillsForSolver(pA),...skillsForSolver(pB)])];
+        const covered=toInherit.filter(s=>poolSkills.includes(s));
+        const missing=toInherit.filter(s=>!poolSkills.includes(s));
+
+        if(strict && missing.length) continue; // skip plans with any gap in strict mode
+
+        let score=covered.length*10;
+        // bonus for owned parents
+        if(ownedSet.has(pA)) score+=3;
+        if(ownedSet.has(pB)) score+=3;
+        // prefer fewer needed fusions (shorter chain = lower combined lvl)
+        score -= (DEMONS[pA].lvl+DEMONS[pB].lvl)/100;
+
+        if(score>bestScore){
+          bestScore=score;
+          bestPlan={pA,pB,predicted,poolSkills,covered,missing,rA,rB};
+        }
+      }
+    }
+  }
+
+  // If strict and no plan found, build detailed reasons
+  if(strict && !bestPlan){
+    if(!reasons.length){
+      // Check if the target demon itself can even be produced by any pair
+      let anyPair=false;
+      for(const [rA,rB] of pairs){
+        const da=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rA&&n!==targetName);
+        const db=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rB&&n!==targetName);
+        for(const a of da) for(const b of db){
+          if(a!==b && predictResult(a,b)===targetName){anyPair=true;break;}
+          if(anyPair) break;
+        }
+        if(anyPair) break;
+      }
+      if(!anyPair){
+        reasons.push(`No combination of demons in the dataset fuses into ${targetName} via level-average rules.`);
+        reasons.push('The compendium data is incomplete — this target may require fusion data not yet entered.');
+      } else {
+        reasons.push(`No parent pair found that can carry ALL desired skills into ${targetName} simultaneously.`);
+        for(const sk of toInherit){
+          const carriers=skillDemonMap[sk]||[];
+          if(!carriers.length) reasons.push(`  • "${sk}": no demon in the dataset has this skill.`);
+          else reasons.push(`  • "${sk}": only on ${carriers.slice(0,4).join(', ')}${carriers.length>4?' and others':''} — check if any can be a parent for ${targetName}.`);
+        }
+        reasons.push('Switch to Best Effort to see the closest partial solution.');
+      }
+    }
+    return {ok:false,reasons};
+  }
+
+  if(!bestPlan){
+    reasons.push(`No parent pair in the dataset resolves to ${targetName} via level-average rules.`);
+    reasons.push('The compendium is incomplete — add more demons or try a different target.');
+    return {ok:false,reasons};
+  }
+
+  // Build step objects
+  const steps=[{
+    pA:bestPlan.pA,
+    pB:bestPlan.pB,
+    result:targetName,
+    inheritedPool:bestPlan.poolSkills,
+    coveredDesired:bestPlan.covered,
+    missing:bestPlan.missing
+  }];
+
+  const missingSkills=bestPlan.missing;
+  return {
+    ok: missingSkills.length===0,
+    partial: missingSkills.length>0,
+    steps,
+    alreadyHave,
+    missing: missingSkills,
+    reasons
   };
-  renderWorkbench();
 }
-function addResultToChain(){
-  if(!appState.lastCalc) return;
-  appState.chain.push({...appState.lastCalc});
-  renderChain();
-  toast(`${appState.lastCalc.result} added to chain`);
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+function sbTab(t){
+  S.sbTab=t;
+  document.getElementById('tabOwned').className='sb-tab'+(t==='owned'?' active':'');
+  document.getElementById('tabAll').className='sb-tab'+(t==='all'?' active':'');
+  renderSidebar();
 }
-function compactCard(name, skills, label='', open=false){
-  const d=DEMONS[name];
-  const split=splitSkills(skills||[]);
-  const res=d.resists.split('').map((c,i)=>`<div class="res-chip ${getResClass(c)}"><span>${RES_NAMES[i]}</span><strong>${RES_SHOW[c]||'—'}</strong></div>`).join('');
-  const stats=['Str','HP','MP','St','Ma','Vi','Ag'].map((s,i)=>`<div class="stat"><span>${s}</span>${d.stats[i]}</div>`).join('');
-  const cmdSlots=[0,1,2].map(i=>skillSlot(split.cmd[i], 'cmd')).join('');
-  const pasSlots=[0,1,2].map(i=>skillSlot(split.pas[i], 'pas')).join('');
-  const bodyId='body-'+Math.random().toString(36).slice(2);
-  return `<div class="compact-card">
-    <div class="compact-head" onclick="toggleBody('${bodyId}')">
-      <div class="compact-main">
-        ${label?`<span class="badge">${label}</span>`:''}
-        <span class="compact-title">${name}</span>
-        <span class="badge">Lv${d.lvl}</span>
-        <span class="badge">${d.race}</span>
+function renderSidebar(){
+  const q=(document.getElementById('sbSearch').value||'').toLowerCase();
+  const race=document.getElementById('sbRace').value||'';
+  let names=demonNames.filter(n=>{
+    if(!n.toLowerCase().includes(q)) return false;
+    if(race && DEMONS[n].race!==race) return false;
+    if(S.sbTab==='owned' && !isOwned(n)) return false;
+    return true;
+  });
+  const list=document.getElementById('demonList');
+  if(!names.length){
+    list.innerHTML=`<div class="empty">${S.sbTab==='owned'?'No owned demons yet. Click ★ in All Demons.':'No demons match.'}</div>`;
+    return;
+  }
+  list.innerHTML=names.map(n=>{
+    const d=DEMONS[n],owned=isOwned(n);
+    return `<div class="demon-row" onclick="openOwnedEditor('${esc(n)}')">
+      <span class="star ${owned?'on':''}" onclick="event.stopPropagation();toggleOwned('${esc(n)}')" title="${owned?'Remove from owned':'Mark as owned'}">★</span>
+      <div class="d-meta"><div class="d-name">${n}</div><div class="d-sub">Lv${d.lvl} · ${d.race}</div></div>
+      ${owned?'<span class="badge good">Owned</span>':''}
+    </div>`;
+  }).join('');
+}
+function toggleOwned(name){
+  const st=ensureOwned(name);st.owned=!st.owned;
+  renderSidebar();populateTargetSelect();
+  toast(st.owned?`${name} marked as owned`:`${name} removed from owned`);
+}
+function openOwnedEditor(name){
+  // For now: toggle owned and open skill editor inline
+  // A proper modal would be added next iteration
+  toggleOwned(name);
+}
+
+// ─── TARGET SELECT ────────────────────────────────────────────────────────────
+function populateTargetSelect(){
+  const sel=document.getElementById('targetSelect');
+  const cur=S.target;
+  sel.innerHTML='<option value="">— Choose target —</option>';
+  demonNames.forEach(n=>{
+    const d=DEMONS[n],owned=isOwned(n);
+    const o=document.createElement('option');
+    o.value=n;
+    o.textContent=`${n} (Lv${d.lvl} ${d.race})${owned?' ★':''}`;
+    sel.appendChild(o);
+  });
+  if(cur) sel.value=cur;
+}
+function onTargetChange(){
+  S.target=document.getElementById('targetSelect').value;
+  S.desiredSkills=[];
+  renderTargetPanel();
+}
+function renderTargetPanel(){
+  const name=S.target;
+  document.getElementById('skillSelector').style.display=name?'block':'none';
+  if(!name){document.getElementById('targetCard').innerHTML='';return;}
+  renderSkillSelector();
+  document.getElementById('targetCard').innerHTML=demonCard(name,[],[],'Target');
+}
+function resetTarget(){
+  S.target='';S.desiredSkills=[];S.lastResult=null;
+  document.getElementById('targetSelect').value='';
+  document.getElementById('recipeOutput').innerHTML='';
+  renderTargetPanel();
+}
+
+// ─── SKILL SELECTOR ───────────────────────────────────────────────────────────
+function renderSkillSelector(){
+  const name=S.target;
+  if(!name) return;
+  const innate=new Set(allSkillsOf(name));
+  const sel=new Set(S.desiredSkills);
+  const cmdSel=S.desiredSkills.filter(isCmd).length;
+  const pasSel=S.desiredSkills.filter(s=>!isCmd(s)).length;
+  document.getElementById('cmdCount').textContent=cmdSel;
+  document.getElementById('pasCount').textContent=pasSel;
+
+  function poolRow(skill){
+    const selected=sel.has(skill);
+    const type=skType(skill);
+    const fromInnate=innate.has(skill);
+    const carriers=Object.keys(DEMONS).filter(n=>allSkillsOf(n).includes(skill)&&n!==name);
+    const hint=fromInnate?'Innate on target':carriers.length?`On: ${carriers.slice(0,3).join(', ')}${carriers.length>3?'…':''}`:'Not found in dataset';
+    return `<div class="skill-row ${selected?'selected':''}" onclick="toggleDesired('${esc(skill)}','${type}')">
+      <div>
+        <div class="skill-name">${skill}${fromInnate?' <span style="color:var(--good);font-size:.68rem">(innate)</span>':''}</div>
+        <div class="skill-source">${hint}</div>
       </div>
-      <span class="small">details</span>
+      <span class="badge ${selected?'good':''}">  ${selected?'✓ selected':'+ add'}</span>
+    </div>`;
+  }
+
+  // Show all skills, but prioritise: innate first, then those that exist on other demons
+  const cmdPool=ALL_SKILLS.filter(isCmd);
+  const pasPool=ALL_SKILLS.filter(s=>!isCmd(s));
+  document.getElementById('cmdPool').innerHTML=cmdPool.map(poolRow).join('');
+  document.getElementById('pasPool').innerHTML=pasPool.map(poolRow).join('');
+
+  const stripEl=document.getElementById('selectedSkills');
+  if(!S.desiredSkills.length){
+    stripEl.innerHTML='<span style="color:var(--muted);font-size:.78rem">None selected</span>';
+  } else {
+    stripEl.innerHTML=S.desiredSkills.map(s=>`<span class="slot-pill ${skType(s)}" onclick="removeDesired('${esc(s)}')" title="Remove">${s} ✕</span>`).join('');
+  }
+}
+function toggleDesired(skill,type){
+  const idx=S.desiredSkills.indexOf(skill);
+  if(idx>-1){S.desiredSkills.splice(idx,1);}
+  else{
+    const count=S.desiredSkills.filter(s=>skType(s)===type).length;
+    if(count>=3){toast(`Only 3 ${type.toUpperCase()} slots available`);return;}
+    S.desiredSkills.push(skill);
+  }
+  renderSkillSelector();
+}
+function removeDesired(skill){
+  S.desiredSkills=S.desiredSkills.filter(s=>s!==skill);
+  renderSkillSelector();
+}
+
+// ─── GENERATE ────────────────────────────────────────────────────────────────
+function generateRecipe(){
+  if(!S.target){toast('Pick a target demon first');return;}
+  const strict=document.getElementById('strictToggle').checked;
+  const result=solve(S.target,S.desiredSkills,strict);
+  S.lastResult=result;
+  renderRecipeOutput(result,strict);
+}
+function renderRecipeOutput(result,strict){
+  const out=document.getElementById('recipeOutput');
+  if(!result.ok && !result.partial){
+    out.innerHTML=failurePanel(result.reasons);
+    return;
+  }
+  const step=result.steps[0];
+  const targetSkillsFinal=[
+    ...result.alreadyHave,
+    ...result.steps[0].coveredDesired
+  ];
+
+  let html='';
+
+  // Partial warning in best-effort
+  if(result.partial){
+    html+=`<div class="failure-panel" style="border-color:#3e3112;background:#191108;margin-bottom:12px">
+      <div class="failure-title" style="color:var(--warn)">⚠ Best Effort — some skills could not be covered</div>
+      <div class="failure-reasons">${result.missing.map(s=>`<div class="failure-reason" style="border-color:var(--warn)">
+        <b>${s}</b>: no parent demon in this dataset has this skill, or it cannot be carried into ${S.target} with the current data.
+      </div>`).join('')}</div>
+    </div>`;
+  }
+
+  html+=`<div class="result-panel">
+    <div class="result-head">
+      <span class="result-title">${step.pA} × ${step.pB} → ${step.result}</span>
+      ${isOwned(step.pA)?'<span class="badge good">'+step.pA+' owned</span>':''}
+      ${isOwned(step.pB)?'<span class="badge good">'+step.pB+' owned</span>':''}
     </div>
-    <div id="${bodyId}" class="compact-body ${open?'open':''}">
-      <div class="stats">${stats}</div>
-      <div class="resists">${res}</div>
-      <div class="skill-columns">
-        <div class="skill-box"><div class="skill-head cmd">Command slots (3)</div><div class="skill-list">${cmdSlots}</div></div>
-        <div class="skill-box"><div class="skill-head pas">Passive slots (3)</div><div class="skill-list">${pasSlots}</div></div>
+    <div class="result-body">
+      <div class="grid2">
+        ${demonCard(step.pA,skillsForSolver(step.pA),result.steps[0].coveredDesired,'Parent A')}
+        ${demonCard(step.pB,skillsForSolver(step.pB),result.steps[0].coveredDesired,'Parent B')}
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:6px">Result — ${step.result}</div>
+        ${demonCard(step.result,targetSkillsFinal,S.desiredSkills,'Result',true)}
+      </div>
+      <div class="note">
+        <b>Inherited skill pool</b> (from both parents): ${step.inheritedPool.join(', ')||'none'}.<br/>
+        Skills marked <span style="color:var(--accent)">Wanted</span> are your desired skills.
+        Skills marked <span style="color:var(--good)">Innate</span> are guaranteed. Inherited skills depend on slot luck (~75% per slot).
+      </div>
+    </div>
+  </div>`;
+
+  out.innerHTML=html;
+}
+function failurePanel(reasons){
+  return `<div class="failure-panel">
+    <div class="failure-title">✕ No valid recipe found</div>
+    <div class="failure-reasons">${reasons.map(r=>`<div class="failure-reason">${r}</div>`).join('')}</div>
+  </div>`;
+}
+
+// ─── DEMON CARD ───────────────────────────────────────────────────────────────
+function demonCard(name,highlightSkills=[],wantedSkills=[],label='',open=false){
+  const d=DEMONS[name];if(!d) return '';
+  const innate=new Set(allSkillsOf(name));
+  const highlightSet=new Set(highlightSkills);
+  const wantedSet=new Set(wantedSkills);
+  const id='dc-'+Math.random().toString(36).slice(2);
+
+  const stats=STAT_LABELS.map((l,i)=>`<div class="stat-chip"><span>${l}</span>${d.stats[i]}</div>`).join('');
+  const res=d.resists.split('').map((c,i)=>{
+    return `<div class="res-chip ${RES_CLASS[c]||'normal'}"><span>${RES_NAMES[i]}</span><strong>${RES_SHOW[c]||'—'}</strong></div>`;
+  }).join('');
+
+  // Build final 3+3 skill display
+  const allForCard=[...new Set([...allSkillsOf(name),...highlightSkills])];
+  const cmdSkills=allForCard.filter(isCmd).slice(0,3);
+  const pasSkills=allForCard.filter(s=>!isCmd(s)).slice(0,3);
+
+  function skSlot(skill,type){
+    if(!skill) return `<div class="sk-slot empty">Empty ${type} slot</div>`;
+    const isInn=innate.has(skill);
+    const isWanted=wantedSet.has(skill);
+    const isHighlighted=highlightSet.has(skill)&&!isInn;
+    let pillClass=isWanted?'wanted':type;
+    let pillLabel=isWanted?'WANTED':(isInn?'INNATE':type.toUpperCase());
+    return `<div class="sk-slot">
+      <span class="sk-pill ${pillClass}">${pillLabel}</span>
+      <span>${skill}</span>
+      ${isInn?'<span class="sk-right" style="color:var(--good)">guaranteed</span>':
+        isHighlighted?'<span class="sk-right">from parent</span>':''}
+    </div>`;
+  }
+
+  const cmdHtml=[0,1,2].map(i=>skSlot(cmdSkills[i],'cmd')).join('');
+  const pasHtml=[0,1,2].map(i=>skSlot(pasSkills[i],'pas')).join('');
+
+  return `<div class="demon-card">
+    <div class="demon-card-head" onclick="document.getElementById('${id}').classList.toggle('open')">
+      ${label?`<span class="badge">${label}</span>`:''}
+      <span class="dc-title">${name}</span>
+      <span class="badge">Lv${d.lvl}</span>
+      <span class="badge">${d.race}</span>
+      ${isOwned(name)?'<span class="badge good">Owned</span>':''}
+    </div>
+    <div id="${id}" class="demon-card-body ${open?'open':''}">
+      <div class="stats-row">${stats}</div>
+      <div class="resists-grid">${res}</div>
+      <div class="skills-split">
+        <div class="sk-box"><div class="sk-head cmd">Command (3 slots)</div><div class="sk-body">${cmdHtml}</div></div>
+        <div class="sk-box"><div class="sk-head pas">Passive (3 slots)</div><div class="sk-body">${pasHtml}</div></div>
       </div>
     </div>
   </div>`;
 }
-function skillSlot(skill, type){
-  if(!skill) return `<div class="skill-slot empty">Empty ${type==='cmd'?'command':'passive'} slot</div>`;
-  return `<div class="skill-slot"><div class="skill-left"><span class="skill-type-pill ${type}">${type.toUpperCase()}</span><span>${skill}</span></div></div>`;
-}
-function toggleBody(id){
-  const el=document.getElementById(id); if(el) el.classList.toggle('open');
-}
-function renderChain(){
-  const wrap=document.getElementById('chainList');
-  if(!appState.chain.length){ wrap.innerHTML='<div class="empty">No chain yet. Use Calculate, then Add to Chain.</div>'; return; }
-  wrap.innerHTML = appState.chain.map((step,idx)=>{
-    const bodyId='chain-'+idx;
-    return `<div class="chain-item">
-      <div class="chain-summary" onclick="toggleBody('${bodyId}')">
-        <div class="chain-main">
-          <span class="badge">Step ${idx+1}</span>
-          <strong>${step.parentA}</strong>
-          <span class="arrow">×</span>
-          <strong>${step.parentB}</strong>
-          <span class="arrow">→</span>
-          <strong style="color:var(--good)">${step.result}</strong>
-        </div>
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeChainStep(${idx})">Remove</button>
-      </div>
-      <div id="${bodyId}" class="chain-body">
-        <div class="grid2">
-          <div>
-            ${compactCard(step.parentA, currentSkills(step.parentA), 'Parent A')}
-            <div style="height:8px"></div>
-            ${compactCard(step.parentB, currentSkills(step.parentB), 'Parent B')}
-          </div>
-          <div>
-            ${compactCard(step.result, step.previewSkills, 'Result', true)}
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-function removeChainStep(idx){ appState.chain.splice(idx,1); renderChain(); }
-function clearChain(){ appState.chain=[]; renderChain(); }
-function copyChain(){
-  if(!appState.chain.length){ toast('Chain is empty'); return; }
-  const text = appState.chain.map((s,i)=>`Step ${i+1}: ${s.parentA} × ${s.parentB} → ${s.result}\n  Skills: ${s.previewSkills.join(', ')||'None'}`).join('\n\n');
-  navigator.clipboard.writeText(text).then(()=>toast('Chain copied')).catch(()=>toast('Copy failed'));
-}
-function openSkillModal(name){
-  appState.editingDemon=name;
-  document.getElementById('skillModalTitle').textContent=`Edit owned skills — ${name}`;
-  document.getElementById('skillSearch').value='';
-  renderSkillModal();
-  document.getElementById('skillModal').classList.add('open');
-}
-function closeSkillModal(){ document.getElementById('skillModal').classList.remove('open'); }
-function renderSkillModal(){
-  const name=appState.editingDemon; if(!name) return;
-  const q=(document.getElementById('skillSearch').value||'').toLowerCase();
-  const owned=ensureOwnedState(name);
-  const current=currentSkills(name);
-  const base=[...new Set([...baseActiveSkills(name),...baseLearnedSkills(name)])];
-  const pool=ALL_SKILLS.filter(s=>s.toLowerCase().includes(q));
-  const cmdCurrent=current.filter(isCmd).slice(0,3);
-  const pasCurrent=current.filter(s=>!isCmd(s)).slice(0,3);
-  document.getElementById('skillModalContent').innerHTML = `
-    <div class="skill-columns">
-      <div class="skill-box">
-        <div class="skill-head cmd">Current command slots</div>
-        <div class="skill-list">${[0,1,2].map(i=>editableSlot(name, cmdCurrent[i], 'cmd', i)).join('')}</div>
-      </div>
-      <div class="skill-box">
-        <div class="skill-head pas">Current passive slots</div>
-        <div class="skill-list">${[0,1,2].map(i=>editableSlot(name, pasCurrent[i], 'pas', i)).join('')}</div>
-      </div>
-    </div>
-    <div class="help">Base/default skills for this demon: ${base.join(', ')||'None'}.</div>
-    <div class="skill-columns">
-      <div class="skill-box">
-        <div class="skill-head cmd">Available command skills</div>
-        <div class="skill-list">${pool.filter(isCmd).map(s=>pickRow(name,s,current.includes(s))).join('')}</div>
-      </div>
-      <div class="skill-box">
-        <div class="skill-head pas">Available passive skills</div>
-        <div class="skill-list">${pool.filter(s=>!isCmd(s)).map(s=>pickRow(name,s,current.includes(s))).join('')}</div>
-      </div>
-    </div>`;
-}
-function editableSlot(name, skill, type, index){
-  return `<div class="skill-slot owned-edit" onclick="removeSkillFromOwned('${esc(name)}','${type}',${index})"><div class="skill-left"><span class="skill-type-pill ${type}">${type.toUpperCase()}</span><span>${skill||'Empty slot'}</span></div><span class="skill-note">${skill?'click to clear':'—'}</span></div>`;
-}
-function pickRow(name, skill, active){
-  return `<div class="skill-pick" onclick="toggleOwnedSkill('${esc(name)}','${esc(skill)}')"><div class="skill-left"><span class="skill-type-pill ${isCmd(skill)?'cmd':'pas'}">${isCmd(skill)?'CMD':'PAS'}</span><span>${skill}</span></div><span class="skill-note">${active?'Selected':'Add'}</span></div>`;
-}
-function normalizeOwnedSkills(name){
-  const st=ensureOwnedState(name);
-  const cmd=st.currentSkills.filter(isCmd).slice(0,3);
-  const pas=st.currentSkills.filter(s=>!isCmd(s)).slice(0,3);
-  st.currentSkills=[...cmd,...pas];
-}
-function toggleOwnedSkill(name, skill){
-  const st=ensureOwnedState(name);
-  const exists=st.currentSkills.includes(skill);
-  if(exists){ st.currentSkills=st.currentSkills.filter(s=>s!==skill); }
-  else {
-    if(isCmd(skill)){
-      const cmd=st.currentSkills.filter(isCmd);
-      if(cmd.length>=3){ toast('Only 3 command slots shown in this build'); return; }
-    } else {
-      const pas=st.currentSkills.filter(s=>!isCmd(s));
-      if(pas.length>=3){ toast('Only 3 passive slots shown in this build'); return; }
-    }
-    st.currentSkills.push(skill);
+
+// ─── COPY ─────────────────────────────────────────────────────────────────────
+function copyResult(){
+  if(!S.lastResult||!S.lastResult.steps){
+    toast('Generate a recipe first');return;
   }
-  normalizeOwnedSkills(name);
-  renderSkillModal();renderWorkbench();renderChain();
+  const step=S.lastResult.steps[0];
+  let t=`Fusion Recipe — ${S.target}\n`;
+  t+=`${step.pA} × ${step.pB} → ${step.result}\n`;
+  if(S.desiredSkills.length) t+=`Desired skills: ${S.desiredSkills.join(', ')}\n`;
+  if(S.lastResult.missing&&S.lastResult.missing.length) t+=`Could not cover: ${S.lastResult.missing.join(', ')}\n`;
+  t+=`Inherited skill pool: ${step.inheritedPool.join(', ')||'none'}`;
+  navigator.clipboard.writeText(t).then(()=>toast('Copied!')).catch(()=>toast('Copy failed'));
 }
-function removeSkillFromOwned(name,type,index){
-  const st=ensureOwnedState(name);
-  const arr=st.currentSkills.filter(s=>type==='cmd'?isCmd(s):!isCmd(s));
-  if(!arr[index]) return;
-  st.currentSkills=st.currentSkills.filter(s=>s!==arr[index]);
-  normalizeOwnedSkills(name);
-  renderSkillModal();renderWorkbench();renderChain();
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
 }
-function esc(s){ return s.replace(/'/g,"\\'"); }
-document.getElementById('skillModal').addEventListener('click', e=>{ if(e.target.id==='skillModal') closeSkillModal(); });
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init(){
+  const races=[...new Set(Object.values(DEMONS).map(d=>d.race))].sort();
+  const rf=document.getElementById('sbRace');
+  races.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;rf.appendChild(o);});
+  Object.keys(DEMONS).forEach(ensureOwned);
+  populateTargetSelect();
+  renderSidebar();
+}
 init();
 </script>
 </body>
