@@ -1,569 +1,643 @@
 /**
  * skill-fusion-generator.component.ts
  * -----------------------------------------------------------------
- * Target-first fusion recipe generator for Devil Survivor Overclocked.
+ * Target-first fusion recipe generator with DP algorithm and Visual Profile
  */
 
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  Inject,
-} from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Subscription, combineLatest } from 'rxjs';
 
-import { Compendium, FusionCalculator, SquareChart } from '../../compendium/models';
 import { FUSION_DATA_SERVICE } from '../../compendium/constants';
-
-import {
-  PlayerState,
-  DEFAULT_PLAYER_STATE,
-  SkillTarget,
-  RankedFusionResult,
-  FusionNode,
-} from '../models/fusion-tree-types';
-import { searchFusionTree } from '../models/fusion-tree-search';
 import { FusionDataService } from '../../smt4f/fusion-data.service';
+import { Compendium } from '../../smt4f/models/compendium';
 
-// ---------------------------------------------------------------------------
-// Local types
-// ---------------------------------------------------------------------------
-
-interface SkillChoice {
-  name: string;
-  isPas: boolean;
-  isInnate: boolean;
-  carriers: string[];
-}
-
-interface StrictFailureReason {
-  skill: string;
-  reason: string;
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+import { FusionDPSolver, DPFusionResult, FusionGraphNode, OwnedDemon } from '../models/fusion-dp-solver';
+import { DemonProfileBuilder } from '../models/demon-profile-builder';
+import { decodeAHSkillTier } from '../models/fusion-tree-types';
 
 @Component({
   selector: 'app-skill-fusion-generator',
   template: `
 <div class="skill-fusion-generator">
 
-  <h2 class="section-title">DSO Skill Fusion Recipe Generator</h2>
+  <h2 class="section-title">Devil Survivor Skill Recipe</h2>
 
-  <!-- 1. Target demon -->
-  <section class="panel target-panel">
-    <h3>1. Target Demon</h3>
+  <!-- 1. Target demon selection -->
+  <section class="panel target-panel" *ngIf="!targetDemonObj">
+    <h3>Select Target Demon</h3>
     <input type="text" placeholder="Search demon…" [(ngModel)]="demonSearchQuery"
       (input)="onDemonSearch()" class="demon-search-input" />
     <ul class="demon-suggestions" *ngIf="demonSuggestions.length > 0">
       <li *ngFor="let d of demonSuggestions" (click)="selectTargetDemon(d)" class="suggestion-item">{{ d }}</li>
     </ul>
-    <div class="selected-demon" *ngIf="targetDemonName">
-      <strong>{{ targetDemonName }}</strong>
-      <span class="demon-meta">{{ targetDemonRace }} · Lv {{ targetDemonLevel }}</span>
+  </section>
+
+  <!-- Demon Profile View -->
+  <section class="panel profile-panel" *ngIf="targetDemonObj">
+    <div class="profile-header">
+      <div class="profile-title">
+        <h3>{{ targetDemonObj.name }}</h3>
+        <span class="demon-meta">{{ targetDemonObj.race }} · Lv {{ targetDemonObj.lvl }}</span>
+      </div>
+      <button class="btn-change" (click)="clearTargetDemon()">Change</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-box"><span>HP</span><strong>{{ targetDemonObj.stats[1] }}</strong></div>
+      <div class="stat-box"><span>MP</span><strong>{{ targetDemonObj.stats[2] }}</strong></div>
+      <div class="stat-box"><span>St</span><strong>{{ targetDemonObj.stats[3] }}</strong></div>
+      <div class="stat-box"><span>Ma</span><strong>{{ targetDemonObj.stats[4] }}</strong></div>
+      <div class="stat-box"><span>Vi</span><strong>{{ targetDemonObj.stats[5] }}</strong></div>
+      <div class="stat-box"><span>Ag</span><strong>{{ targetDemonObj.stats[6] }}</strong></div>
+    </div>
+
+    <div class="slots-container">
+      <!-- Command Skills -->
+      <div class="slot-column">
+        <h4>Command Skills ({{ getFilledSlotCount(freeCmdSlots) + innateCmd.length }}/3)</h4>
+        
+        <!-- Innate Command Skills -->
+        <div class="slot innate-slot" *ngFor="let sk of innateCmd">
+          <span class="slot-icon">🗡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+        </div>
+
+        <!-- Free Command Slots -->
+        <div class="slot free-slot" *ngFor="let sk of freeCmdSlots; let i = index" 
+             (click)="openSkillPicker('cmd', i)"
+             [class.is-filled]="sk !== null"
+             [class.is-active]="activePickerType === 'cmd' && activePickerIndex === i">
+          <span class="slot-icon">🗡</span>
+          <span class="slot-text">{{ sk ? sk : '[ Click to set Command Skill ]' }}</span>
+          <button class="btn-clear-slot" *ngIf="sk" (click)="clearSlot('cmd', i, $event)">✕</button>
+        </div>
+      </div>
+
+      <!-- Passive Skills -->
+      <div class="slot-column">
+        <h4>Passive Skills ({{ getFilledSlotCount(freePasSlots) + innatePas.length }}/3)</h4>
+        
+        <!-- Innate Passive Skills -->
+        <div class="slot innate-slot" *ngFor="let sk of innatePas">
+          <span class="slot-icon">🛡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+        </div>
+
+        <!-- Free Passive Slots -->
+        <div class="slot free-slot" *ngFor="let sk of freePasSlots; let i = index" 
+             (click)="openSkillPicker('pas', i)"
+             [class.is-filled]="sk !== null"
+             [class.is-active]="activePickerType === 'pas' && activePickerIndex === i">
+          <span class="slot-icon">🛡</span>
+          <span class="slot-text">{{ sk ? sk : '[ Click to set Passive Skill ]' }}</span>
+          <button class="btn-clear-slot" *ngIf="sk" (click)="clearSlot('pas', i, $event)">✕</button>
+        </div>
+      </div>
+
+      <!-- Racial Skill -->
+      <div class="slot-column racial-column">
+        <h4>Racial Skill</h4>
+        <div class="slot innate-slot">
+          <span class="slot-icon">★</span> {{ innateRac || 'None' }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Contextual Skill Picker -->
+    <div class="skill-picker" *ngIf="activePickerType">
+      <div class="picker-header">
+        <h5>Select {{ activePickerType === 'cmd' ? 'Command' : 'Passive' }} Skill</h5>
+        <button class="btn-close-picker" (click)="closeSkillPicker()">✕</button>
+      </div>
+      <input type="text" placeholder="Search skill..." [(ngModel)]="skillSearchQuery" (input)="onSkillSearch()" class="skill-picker-input" autofocus />
+      <ul class="picker-suggestions">
+        <li *ngFor="let s of skillSuggestions" (click)="selectSkill(s)" class="picker-item">{{ s }}</li>
+      </ul>
     </div>
   </section>
 
-  <!-- 2. Skill selector -->
-  <section class="panel skills-panel" *ngIf="targetDemonName">
-    <h3>2. Desired Skills</h3>
-    <p class="hint">Up to 3 CMD and 3 PAS. <span class="badge badge-innate">INNATE</span> = already on target (no slot cost).</p>
-    <div class="skill-columns">
-
-      <div class="skill-column">
-        <h4>CMD <span class="slot-counter">({{ selectedCmd.length }}/3)</span></h4>
-        <input type="text" placeholder="Search CMD…" [(ngModel)]="cmdSearchQuery"
-          (input)="onCmdSkillSearch()" [disabled]="selectedCmd.length >= 3" class="skill-search-input" />
-        <ul class="skill-suggestions" *ngIf="cmdSuggestions.length > 0">
-          <li *ngFor="let s of cmdSuggestions" (click)="addCmdSkill(s)" class="suggestion-item">
-            {{ s.name }} <span *ngIf="s.isInnate" class="badge badge-innate">INNATE</span>
-          </li>
-        </ul>
-        <ul class="selected-skills">
-          <li *ngFor="let s of selectedCmd" class="skill-row">
-            <span class="skill-name">{{ s.name }}</span>
-            <span *ngIf="s.isInnate" class="badge badge-innate">INNATE</span>
-            <span class="carriers" *ngIf="s.carriers.length">
-              via: {{ s.carriers.slice(0,3).join(', ') }}<span *ngIf="s.carriers.length > 3"> +{{ s.carriers.length - 3 }} more</span>
-            </span>
-            <button class="btn-remove" (click)="removeCmdSkill(s.name)">✕</button>
-          </li>
-        </ul>
-      </div>
-
-      <div class="skill-column">
-        <h4>PAS <span class="slot-counter">({{ selectedPas.length }}/3)</span></h4>
-        <input type="text" placeholder="Search PAS…" [(ngModel)]="pasSearchQuery"
-          (input)="onPasSkillSearch()" [disabled]="selectedPas.length >= 3" class="skill-search-input" />
-        <ul class="skill-suggestions" *ngIf="pasSuggestions.length > 0">
-          <li *ngFor="let s of pasSuggestions" (click)="addPasSkill(s)" class="suggestion-item">
-            {{ s.name }} <span *ngIf="s.isInnate" class="badge badge-innate">INNATE</span>
-          </li>
-        </ul>
-        <ul class="selected-skills">
-          <li *ngFor="let s of selectedPas" class="skill-row">
-            <span class="skill-name">{{ s.name }}</span>
-            <span *ngIf="s.isInnate" class="badge badge-innate">INNATE</span>
-            <span class="carriers" *ngIf="s.carriers.length">
-              via: {{ s.carriers.slice(0,3).join(', ') }}<span *ngIf="s.carriers.length > 3"> +{{ s.carriers.length - 3 }} more</span>
-            </span>
-            <button class="btn-remove" (click)="removePasSkill(s.name)">✕</button>
-          </li>
-        </ul>
-      </div>
-
+  <!-- Player Level Settings -->
+  <section class="panel settings-panel" *ngIf="targetDemonObj">
+    <h3>Owned Demons</h3>
+    <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 12px;">Add demons you already own to use them as free base ingredients in the fusion tree.</p>
+    
+    <div class="owned-demon-list">
+       <div class="owned-demon-item" *ngFor="let od of ownedDemons; let odIdx = index">
+           <span class="owned-demon-name">{{ od.name }}</span>
+           <div class="owned-demon-skills">
+              <span class="owned-skill" *ngFor="let s of od.skills; let skIdx = index">
+                 {{ s }} <button class="btn-remove-skill" (click)="removeOwnedSkill(odIdx, skIdx)">✕</button>
+              </span>
+              <button class="btn-add-owned-skill" (click)="openOwnedSkillPicker(odIdx)">+ Add Skill</button>
+           </div>
+           <button class="btn-remove-demon" (click)="removeOwnedDemon(odIdx)">✕</button>
+       </div>
     </div>
-  </section>
+  
+    <div class="add-owned-demon-container" style="position: relative;">
+      <input type="text" placeholder="Add owned demon..." [(ngModel)]="ownedDemonSearchQuery" (input)="onOwnedDemonSearch()" class="search-input" />
+      <ul class="suggestions-list" *ngIf="ownedDemonSuggestions.length > 0">
+        <li *ngFor="let s of ownedDemonSuggestions" (click)="addOwnedDemon(s)" class="suggestion-item">{{ s }}</li>
+      </ul>
+    </div>
+    
+    <div class="skill-picker" *ngIf="activeOwnedDemonIndex !== null">
+        <div class="picker-header">
+          <h5>Select Skill for {{ ownedDemons[activeOwnedDemonIndex].name }}</h5>
+          <button class="btn-close-picker" (click)="closeOwnedSkillPicker()">✕</button>
+        </div>
+        <input type="text" placeholder="Search skill..." [(ngModel)]="ownedSkillSearchQuery" (input)="onOwnedSkillSearch()" class="skill-picker-input" autofocus />
+        <ul class="picker-suggestions">
+          <li *ngFor="let s of ownedSkillSuggestions" (click)="selectOwnedSkill(s)" class="picker-item">{{ s }}</li>
+        </ul>
+    </div>
 
-  <!-- 3. Player Settings -->
-  <section class="panel settings-panel" *ngIf="targetDemonName">
-    <h3>3. Player Settings</h3>
+    <hr style="border: 0; border-top: 1px dashed #333; margin: 20px 0;" />
+
+    <h3>Player Level</h3>
     <div class="settings-row">
-      <label class="setting-label">
-        Player Level:
-        <input type="number" [(ngModel)]="playerState.maxLevel" min="1" max="99" class="setting-input" />
-      </label>
-      <label class="setting-label">
-        In-game Day:
-        <input type="number" [(ngModel)]="playerState.currentDay" min="1" max="8" class="setting-input" />
-      </label>
-    </div>
-  </section>
-
-  <!-- 4. Owned demons -->
-  <section class="panel owned-panel" *ngIf="targetDemonName">
-    <h3>4. Owned Demons <span class="hint">(optional — biases solver toward shorter chains)</span></h3>
-    <div class="owned-input-row">
-      <input type="text" placeholder="Demon name" [(ngModel)]="ownedDemonInput" class="owned-demon-input" />
-      <input type="number" placeholder="Lv" [(ngModel)]="ownedLevelInput" min="1" max="99" class="owned-level-input" />
-      <button class="btn-add" (click)="addOwnedDemon()">Add</button>
-    </div>
-    <ul class="owned-list">
-      <li *ngFor="let d of playerState.ownedDemons" class="owned-item">
-        {{ d.name }} Lv {{ d.currentLevel }}
-        <button class="btn-remove" (click)="removeOwnedDemon(d.name)">✕</button>
-      </li>
-    </ul>
-  </section>
-
-  <!-- 5. Controls -->
-  <section class="panel controls-panel" *ngIf="targetDemonName">
-    <h3>5. Generate</h3>
-    <div class="controls-row">
-      <label class="toggle-label">
-        <input type="checkbox" [(ngModel)]="strictMode" />
-        Strict mode <span class="hint">(only show fully-satisfiable chains)</span>
-      </label>
-      <label class="rank-label">
-        Sort by:
-        <select [(ngModel)]="rankStrategy">
-          <option value="cheapest">Cheapest</option>
-          <option value="fewest_steps">Fewest fusions</option>
-          <option value="most_owned_used">Most owned used</option>
-        </select>
-      </label>
-      <button class="btn-generate"
-        (click)="generate()"
-        [disabled]="isSearching || (selectedCmd.length + selectedPas.length) === 0">
-        {{ isSearching ? 'Searching…' : 'Generate Recipe' }}
+      <input type="number" [(ngModel)]="playerMaxLevel" min="1" max="99" class="setting-input" />
+      <button class="btn-generate" (click)="generate()" [disabled]="isSearching">
+        {{ isSearching ? 'Computing Path...' : 'Generate DP Recipe' }}
       </button>
     </div>
   </section>
 
-  <!-- Strict failure panel -->
-  <section class="panel failure-panel" *ngIf="strictMode && strictFailures.length > 0">
-    <h3>⚠ No complete chain found</h3>
-    <ul class="failure-list">
-      <li *ngFor="let f of strictFailures" class="failure-item">
-        <strong>{{ f.skill }}</strong>: {{ f.reason }}
-      </li>
-    </ul>
-  </section>
-
   <!-- Results -->
-  <section class="panel results-panel" *ngIf="results.length > 0">
-    <h3>Results <span class="result-count">({{ results.length }})</span></h3>
-    <div *ngIf="!strictMode && hasPartialResults" class="best-effort-banner">
-      ⚡ Best Effort — some skills could not be fully covered. Missing skills are flagged below.
+  <section class="panel results-panel" *ngIf="dpResults.length > 0">
+    <h3>Optimal Fusion Recipes</h3>
+    
+    <div class="path-tabs">
+      <button class="path-tab" 
+              *ngFor="let res of dpResults; let i = index" 
+              [class.active]="selectedResultIndex === i"
+              (click)="selectedResultIndex = i">
+        <div class="tab-title">Path {{ i + 1 }}</div>
+        <div class="tab-stats">Lv {{ res.maxLevel }} | {{ res.totalFusions }} Steps | {{ res.ahCount }} AH</div>
+        <div class="tab-stats" style="margin-top: 2px;">{{ res.summonCount }} Summons | {{ res.maccaCost | number }} Macca</div>
+      </button>
     </div>
-    <div *ngFor="let r of results" class="result-card"
-      [class.tier-available]="r.reachabilityTier === 'available_now'"
-      [class.tier-soon]="r.reachabilityTier === 'soon'"
-      [class.tier-later]="r.reachabilityTier === 'later_game'">
-      <div class="result-header">
-        <span class="result-rank">#{{ r.rank }}</span>
-        <span class="result-cost">{{ r.totalCost | number }} Macca</span>
-        <span class="result-fusions">{{ r.totalFusions }} fusion{{ r.totalFusions === 1 ? '' : 's' }}</span>
-        <span class="result-owned" *ngIf="r.ownedLeafCount > 0">🗂 {{ r.ownedLeafCount }} owned</span>
-        <span class="tier-badge tier-{{ r.reachabilityTier }}">
-          {{ r.reachabilityTier === 'available_now' ? '✓ Available' : r.reachabilityTier === 'soon' ? '⏳ Soon' : '🔒 Later' }}
-        </span>
-      </div>
-      <div class="ah-warning" *ngIf="r.ahOnlySkills.length > 0">
-        <strong>AH purchase required:</strong>
-        <span *ngFor="let s of r.ahOnlySkills"> {{ s.skillName }} ({{ s.onDemon }})</span>
-      </div>
-      <ul class="blocker-list" *ngIf="r.blockers.length > 0">
-        <li *ngFor="let b of r.blockers" class="blocker-item">⚠ {{ b.detail }}</li>
-      </ul>
-      <div class="fusion-chain">
-        <ng-container *ngTemplateOutlet="fusionNode; context: { $implicit: r.root, depth: 0 }"></ng-container>
+
+    <div class="dp-tree-view">
+      <ng-template #fusionNode let-node="node">
+        <div class="tree-node" [class.is-natural]="node.isNatural">
+          <div class="node-info">
+            <span class="step-badge" *ngIf="node.stepNumber">{{ node === dpResults[selectedResultIndex].graph[0] ? 'Final Result' : 'Step ' + node.stepNumber }}</span>
+            <span class="node-demon">{{ node.demon }}</span>
+            <span class="node-skills" *ngIf="node.skills.length">
+              [<ng-container *ngFor="let sk of node.skills; let last = last">
+                {{ sk }}<span *ngIf="node.isNatural && !node.isOwned" class="skill-req"> ({{ getSkillAcquisition(node.demon, sk) }})</span><span *ngIf="!last">, </span>
+              </ng-container>]
+            </span>
+            <span class="node-label" *ngIf="node.isNatural && !node.isOwned" style="color: #777; font-size: 0.8rem; margin-left: 8px;">(Summon)</span>
+            <span class="node-label" *ngIf="node.isOwned" style="color: #6bb36b; font-size: 0.8rem; margin-left: 8px;">(Owned)</span>
+          </div>
+          <div class="node-children" *ngIf="node.recipe">
+            <ng-container *ngTemplateOutlet="fusionNode; context: { node: getNode(node.recipe.ingredient1Id) }"></ng-container>
+            <ng-container *ngTemplateOutlet="fusionNode; context: { node: getNode(node.recipe.ingredient2Id) }"></ng-container>
+          </div>
+        </div>
+      </ng-template>
+
+      <!-- Start rendering from root node -->
+      <div class="tree-root">
+        <ng-container *ngTemplateOutlet="fusionNode; context: { node: dpResults[selectedResultIndex].graph[0] }"></ng-container>
       </div>
     </div>
   </section>
-
-  <section class="panel empty-state" *ngIf="hasSearched && !isSearching && results.length === 0 && strictFailures.length === 0">
-    <p>No fusion paths found. Try relaxing skill requirements or switching to Best Effort mode.</p>
+  
+  <section class="panel failure-panel" *ngIf="searchFailed">
+    <h3>⚠ No path found</h3>
+    <p>The DP algorithm could not find a path under Level {{ playerMaxLevel }} with these specific skills. This usually means the skills are locked to unique demons that cannot interact, or the fusion tree is impossible without exceeding the level cap.</p>
   </section>
 
 </div>
-
-<ng-template #fusionNode let-node let-depth="depth">
-  <div class="fusion-node" [style.marginLeft.px]="depth * 16">
-    <div class="node-header">
-      <span class="node-demon">{{ node.demon }}</span>
-      <span class="node-cost" *ngIf="depth > 0">{{ node.totalCost | number }} ¥</span>
-      <span class="node-method" *ngIf="!node.left && !node.right">
-        {{ node.reachability.method.type === 'innate' ? '📦 Owned'
-           : node.reachability.method.type === 'auction' ? '🏪 AH'
-           : '🔀 Fuse/Get' }}
-      </span>
-    </div>
-    <div class="node-skills" *ngIf="node.skillsContributed.length > 0">
-      <span *ngFor="let s of node.skillsContributed" class="skill-tag"
-        [class.skill-innate]="isInnateOnTarget(s)">
-        {{ s }}
-        <span class="skill-src">{{ getSkillSrc(s, node) }}</span>
-      </span>
-    </div>
-    <ng-container *ngIf="node.left || node.right">
-      <div class="fusion-arrow">▼ fuse</div>
-      <ng-container *ngIf="node.left">
-        <ng-container *ngTemplateOutlet="fusionNode; context: { $implicit: node.left, depth: depth + 1 }"></ng-container>
-      </ng-container>
-      <ng-container *ngIf="node.right">
-        <ng-container *ngTemplateOutlet="fusionNode; context: { $implicit: node.right, depth: depth + 1 }"></ng-container>
-      </ng-container>
-    </ng-container>
-  </div>
-</ng-template>
   `,
   styles: [`
-    .skill-fusion-generator{max-width:900px;margin:0 auto;padding:16px;font-family:inherit}
-    .section-title{font-size:1.4rem;margin-bottom:16px}
-    .panel{background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:16px;margin-bottom:16px}
-    h3{margin:0 0 12px;font-size:1rem;color:#ccc} h4{margin:0 0 8px;font-size:.9rem;color:#aaa}
-    .hint{font-size:.8rem;color:#888}
-    input[type=text],input[type=number],select{background:#111;color:#eee;border:1px solid #555;border-radius:4px;padding:6px 10px;font-size:.9rem}
-    .demon-search-input,.skill-search-input,.owned-demon-input{width:220px}
-    .owned-level-input{width:70px}
-    .demon-suggestions,.skill-suggestions{list-style:none;margin:0;padding:0;background:#222;border:1px solid #555;border-radius:4px;max-height:180px;overflow-y:auto;position:relative;z-index:10}
-    .suggestion-item{padding:6px 10px;cursor:pointer} .suggestion-item:hover{background:#333}
-    .selected-demon{margin-top:8px} .demon-meta{margin-left:8px;color:#888;font-size:.85rem}
-    .skill-columns{display:flex;gap:24px} .skill-column{flex:1;min-width:0}
-    .slot-counter{font-size:.8rem;color:#888}
-    .selected-skills{list-style:none;margin:8px 0 0;padding:0}
-    .skill-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #2a2a3a;flex-wrap:wrap}
-    .skill-name{font-size:.9rem} .carriers{font-size:.75rem;color:#888;flex:1}
-    .badge{font-size:.7rem;padding:1px 5px;border-radius:3px;font-weight:bold}
-    .badge-innate{background:#1a5c1a;color:#7dff7d}
-    .btn-remove{background:transparent;border:none;color:#c55;cursor:pointer;font-size:.85rem}
-    .btn-add{background:#2255aa;color:#fff;border:none;border-radius:4px;padding:6px 14px;cursor:pointer;margin-left:6px}
-    .btn-generate{background:#3a5c20;color:#fff;border:none;border-radius:4px;padding:8px 24px;font-size:1rem;cursor:pointer;margin-left:12px}
-    .btn-generate:disabled{opacity:.5;cursor:default}
-    .controls-row{display:flex;align-items:center;flex-wrap:wrap;gap:16px}
-    .toggle-label,.rank-label{font-size:.9rem;color:#ccc}
-    .settings-row{display:flex;gap:16px;align-items:center;margin-top:8px}
-    .setting-label{font-size:.9rem;color:#ccc;display:flex;align-items:center;gap:8px}
-    .setting-input{width:60px;text-align:center}
-    .owned-input-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-    .owned-list{list-style:none;margin:0;padding:0}
-    .owned-item{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.88rem}
-    .result-card{border:1px solid #444;border-radius:6px;padding:12px;margin-bottom:12px}
-    .tier-available{border-color:#2a7a2a} .tier-soon{border-color:#7a6a1a} .tier-later{border-color:#7a2a2a}
-    .result-header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-    .result-rank{font-weight:bold;font-size:1.1rem} .result-cost{color:#f4c060}
-    .result-fusions{color:#aaa;font-size:.85rem} .result-owned{color:#88cc88;font-size:.85rem}
-    .tier-badge{font-size:.8rem;padding:2px 8px;border-radius:4px}
-    .tier-available_now{background:#1a5c1a;color:#7dff7d}
-    .tier-soon{background:#5c4e1a;color:#ffe77d}
-    .tier-later_game{background:#5c1a1a;color:#ff9d9d}
-    .ah-warning{background:#3a2800;border:1px solid #7a5a00;border-radius:4px;padding:6px 10px;margin-bottom:8px;font-size:.85rem}
-    .blocker-list{list-style:none;margin:0 0 8px;padding:0}
-    .blocker-item{color:#ffaaaa;font-size:.82rem;padding:2px 0}
-    .failure-panel{border-color:#7a2a2a} .failure-list{list-style:none;margin:0;padding:0}
-    .failure-item{padding:4px 0;font-size:.88rem}
-    .best-effort-banner{background:#2a2000;border:1px solid #665500;border-radius:4px;padding:8px 12px;margin-bottom:12px;font-size:.88rem;color:#ffdd88}
-    .fusion-chain{margin-top:8px} .fusion-node{margin-bottom:4px}
-    .node-header{display:flex;align-items:center;gap:8px}
-    .node-demon{font-weight:bold} .node-cost{color:#f4c060;font-size:.82rem} .node-method{font-size:.78rem;color:#aaa}
-    .node-skills{margin:2px 0 2px 8px;display:flex;flex-wrap:wrap;gap:4px}
-    .skill-tag{font-size:.78rem;padding:1px 6px;border-radius:3px;background:#2a2a3a}
-    .skill-innate{background:#1a5c1a} .skill-src{font-size:.7rem;color:#999;margin-left:3px}
-    .fusion-arrow{color:#666;font-size:.8rem;margin:2px 0}
-    .empty-state{color:#888;text-align:center;padding:32px} .result-count{font-size:.85rem;color:#888}
+    .skill-fusion-generator { max-width: 900px; margin: 0 auto; padding: 16px; font-family: inherit; }
+    .section-title { font-size: 1.4rem; margin-bottom: 16px; }
+    .panel { background: #1a1a2e; border: 1px solid #444; border-radius: 6px; padding: 16px; margin-bottom: 16px; position: relative; }
+    h3 { margin: 0 0 12px; font-size: 1.1rem; color: #eee; }
+    h4 { margin: 0 0 8px; font-size: 0.95rem; color: #aaa; border-bottom: 1px solid #333; padding-bottom: 4px; }
+    
+    input[type=text], input[type=number] { background: #111; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 8px 10px; font-size: 0.9rem; }
+    .demon-search-input { width: 300px; }
+    .setting-input { width: 80px; text-align: center; }
+    
+    .demon-suggestions, .picker-suggestions { list-style: none; margin: 4px 0 0; padding: 0; background: #222; border: 1px solid #555; border-radius: 4px; max-height: 200px; overflow-y: auto; position: absolute; z-index: 10; width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .suggestion-item, .picker-item { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #333; }
+    .suggestion-item:hover, .picker-item:hover { background: #3a5c20; }
+    
+    .profile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .profile-title h3 { margin: 0; font-size: 1.4rem; color: #fff; }
+    .demon-meta { color: #88cc88; font-size: 0.9rem; }
+    .btn-change { background: #444; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+    
+    .stats-row { display: flex; gap: 12px; margin-bottom: 24px; background: #111; padding: 12px; border-radius: 6px; }
+    .stat-box { display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .stat-box span { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+    .stat-box strong { font-size: 1.1rem; color: #eee; }
+    
+    .slots-container { display: flex; gap: 24px; flex-wrap: wrap; }
+    .slot-column { flex: 1; min-width: 250px; }
+    .racial-column { flex: 0.5; min-width: 150px; }
+    
+    .slot { display: flex; align-items: center; padding: 8px 12px; margin-bottom: 8px; border-radius: 4px; font-size: 0.9rem; }
+    .slot-icon { margin-right: 8px; opacity: 0.6; }
+    .innate-slot { background: #111; border: 1px solid #333; color: #ccc; }
+    .free-slot { background: #222; border: 1px dashed #555; color: #888; cursor: pointer; transition: all 0.2s; position: relative; }
+    .free-slot:hover { border-color: #88cc88; background: #2a3a2a; color: #eee; }
+    .free-slot.is-filled { border-style: solid; color: #eee; border-color: #444; }
+    .free-slot.is-active { border-color: #7dff7d; background: #1a3c1a; }
+    
+    .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; font-weight: bold; margin-left: auto; }
+    .badge-innate { background: #1a5c1a; color: #7dff7d; }
+    
+    .btn-clear-slot { position: absolute; right: 8px; background: transparent; border: none; color: #c55; cursor: pointer; font-size: 1rem; padding: 4px; }
+    .btn-clear-slot:hover { color: #f55; }
+    
+    .skill-picker { background: #1a1a2e; border: 1px solid #7dff7d; border-radius: 6px; padding: 16px; margin-top: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.8); }
+    .picker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .picker-header h5 { margin: 0; color: #7dff7d; font-size: 1rem; }
+    .btn-close-picker { background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 1.2rem; }
+    .skill-picker-input { width: 100%; margin-bottom: 12px; }
+    .picker-suggestions { position: static; width: 100%; max-height: 250px; }
+    
+    .settings-row { display: flex; gap: 16px; align-items: center; }
+    .btn-generate { padding: 8px 16px; background: #c34242; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+    .btn-generate:hover { background: #d65151; }
+    .btn-generate:disabled { opacity: 0.5; cursor: default; }
+    
+    .path-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .path-tab { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px 16px; cursor: pointer; text-align: left; transition: all 0.2s; }
+    .path-tab:hover { background: #222; border-color: #555; }
+    .path-tab.active { background: #2d5a2d; border-color: #a1d99b; }
+    .tab-title { font-weight: bold; color: #fff; margin-bottom: 4px; }
+    .tab-stats { font-size: 0.85rem; color: #aaa; }
+    .path-tab.active .tab-stats { color: #d4f0ce; }
+
+    /* Tree View */
+    .dp-tree-view { padding: 16px; background: #111; border-radius: 6px; border: 1px solid #333; }
+    .tree-root > .tree-node { margin-left: 0; border-left: none; padding-left: 0; }
+    .tree-root > .tree-node::before { display: none; }
+    .tree-node { margin: 8px 0 8px 24px; border-left: 2px solid #444; padding-left: 16px; position: relative; }
+    .tree-node::before { content: ''; position: absolute; left: 0; top: 16px; width: 16px; height: 2px; background: #444; }
+    .node-info { background: #222; padding: 6px 12px; border-radius: 4px; display: inline-block; border: 1px solid #333; }
+    .step-badge { background: #444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase; margin-right: 8px; font-weight: bold; }
+    .tree-root    .tree-node.is-natural .node-info { border-style: dashed; border-color: #555; background: #1a1a1a; }
+    .tree-node.is-natural:has(.node-label:contains("(Owned)")) .node-info { border-style: solid; border-color: #2d5a2d; background: #162416; }
+    .node-demon { font-weight: bold; color: #a1d99b; margin-right: 8px; }
+    
+    /* Owned Demons */
+    .owned-demon-item { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+    .owned-demon-name { font-weight: bold; width: 120px; flex-shrink: 0; }
+    .owned-demon-skills { display: flex; gap: 8px; flex-grow: 1; align-items: center; flex-wrap: wrap; }
+    .owned-skill { background: #333; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+    .btn-remove-skill { background: none; border: none; color: #999; cursor: pointer; font-size: 0.8rem; padding: 0; margin-top: -1px; }
+    .btn-remove-skill:hover { color: #fff; }
+    .btn-add-owned-skill { background: #222; border: 1px dashed #555; border-radius: 12px; padding: 2px 8px; font-size: 0.85rem; color: #ccc; cursor: pointer; }
+    .btn-add-owned-skill:hover { background: #333; color: #fff; }
+    .btn-remove-demon { background: none; border: none; color: #c34242; cursor: pointer; font-size: 1.1rem; padding: 0; margin-left: 12px; }
+    .btn-remove-demon:hover { color: #f55; }
+    
+    .node-skills { color: #f1c40f; font-size: 0.9em; margin-left: 8px; }
+    .skill-req { color: #aaa; font-size: 0.85em; font-style: italic; }
+    .is-natural > .node-info { background: #1a1a1a; border-style: dashed; }
+    .is-natural > .node-info > .node-demon { color: #888; }
+    
+    .failure-panel { border-color: #7a2a2a; }
+    .failure-panel p { color: #ffaaaa; line-height: 1.5; font-size: 0.95rem; margin: 0; }
   `]
 })
 export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
+  compendium: Compendium;
+  sub: Subscription;
 
-  // compendium
-  private compendium: Compendium | null = null;
-  private squareChart: SquareChart | null = null;
-  private sub = new Subscription();
-
-  // target demon
+  // Search State
   demonSearchQuery = '';
   demonSuggestions: string[] = [];
-  targetDemonName  = '';
-  targetDemonRace  = '';
-  targetDemonLevel = 0;
-  private allDemonNames: string[] = [];
-  private targetInnateSet = new Set<string>();
+  
+  // Profile State
+  targetDemonObj: any = null;
+  innateCmd: string[] = [];
+  innatePas: string[] = [];
+  innateRac: string = '';
+  
+  freeCmdSlots: (string | null)[] = [];
+  freePasSlots: (string | null)[] = [];
+  
+  // Skill Picker State
+  activePickerType: 'cmd' | 'pas' | null = null;
+  activePickerIndex: number = -1;
+  skillSearchQuery = '';
+  skillSuggestions: string[] = [];
 
-  // skill selection
-  cmdSearchQuery = ''; pasSearchQuery = '';
-  cmdSuggestions: SkillChoice[] = []; pasSuggestions: SkillChoice[] = [];
-  selectedCmd: SkillChoice[] = []; selectedPas: SkillChoice[] = [];
-  private allCmdSkills: SkillChoice[] = [];
-  private allPasSkills: SkillChoice[] = [];
+  // Solver State
+  playerMaxLevel: number = 99;
+  
+  dpResults: DPFusionResult[] = [];
+  selectedResultIndex: number = 0;
+  
+  isSearching: boolean = false;
+  searchFailed: boolean = false;
 
-  // owned demons
-  ownedDemonInput = ''; ownedLevelInput = 1;
-  playerState: PlayerState = { ...DEFAULT_PLAYER_STATE };
-  private readonly STORAGE_KEY = 'dso-owned-demons';
+  fusionChart: any;
 
-  // controls
-  strictMode = false;
-  rankStrategy: 'cheapest' | 'fewest_steps' | 'most_owned_used' = 'cheapest';
-  isSearching = false;
-
-  // results
-  results: RankedFusionResult[] = [];
-  strictFailures: StrictFailureReason[] = [];
-  hasSearched = false;
-  hasPartialResults = false;
+  // Owned Demons State
+  ownedDemons: OwnedDemon[] = [];
+  ownedDemonSearchQuery: string = '';
+  ownedDemonSuggestions: string[] = [];
+  activeOwnedDemonIndex: number | null = null;
+  ownedSkillSearchQuery: string = '';
+  ownedSkillSuggestions: string[] = [];
 
   constructor(
-    @Inject(FUSION_DATA_SERVICE) private fusionDataService: FusionDataService,
     private route: ActivatedRoute,
-  ) {}
-
-  ngOnInit(): void {
-    const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (stored) {
-      try { this.playerState = { ...DEFAULT_PLAYER_STATE, ownedDemons: JSON.parse(stored) }; }
-      catch { /* ignore */ }
-    }
-
-    this.sub.add(
-      combineLatest([
-        this.fusionDataService.compendium,
-        this.fusionDataService.fusionChart,
-      ]).subscribe(([comp, chart]) => {
-        this.compendium  = comp;
-        this.squareChart = { normalChart: chart, tripleChart: chart } as SquareChart;
-        this.allDemonNames = comp.allDemons
-          .filter(d => !d.isEnemy)
-          .map(d => d.name)
-          .sort();
-      })
-    );
-  }
-
-  ngOnDestroy(): void { this.sub.unsubscribe(); }
-
-  // ---- demon search ----
-
-  onDemonSearch(): void {
-    const q = this.demonSearchQuery.toLowerCase().trim();
-    this.demonSuggestions = q.length < 1 ? [] :
-      this.allDemonNames.filter(n => n.toLowerCase().includes(q)).slice(0, 10);
-  }
-
-  selectTargetDemon(name: string): void {
-    this.targetDemonName  = name;
-    this.demonSearchQuery = '';
-    this.demonSuggestions = [];
-    this.selectedCmd = []; this.selectedPas = [];
-    this.results = []; this.strictFailures = [];
-    this.hasSearched = false;
-    if (!this.compendium) { return; }
-    const demon = this.compendium.getDemon(name);
-    if (!demon) { return; }
-    this.targetDemonRace  = demon.race;
-    this.targetDemonLevel = demon.lvl;
-    this.targetInnateSet  = new Set(Object.keys(demon.skills));
-    this.buildSkillLists();
-  }
-
-  // ---- skill lists ----
-
-  private readonly PASSIVE_ELEMS = new Set(['aut', 'pas', 'auto']);
-
-  private buildSkillLists(): void {
-    if (!this.compendium) { return; }
-    this.allCmdSkills = [];
-    this.allPasSkills = [];
-    for (const skill of this.compendium.allSkills) {
-      const isPas    = this.PASSIVE_ELEMS.has((skill.element || '').toLowerCase());
-      const isInnate = this.targetInnateSet.has(skill.name);
-      const carriers = (skill.learnedBy || []).filter(e => e.level <= 99).map(e => e.demon);
-      const choice: SkillChoice = { name: skill.name, isPas, isInnate, carriers };
-      isPas ? this.allPasSkills.push(choice) : this.allCmdSkills.push(choice);
-    }
-  }
-
-  onCmdSkillSearch(): void {
-    const q = this.cmdSearchQuery.toLowerCase().trim();
-    const sel = new Set(this.selectedCmd.map(s => s.name));
-    this.cmdSuggestions = q.length < 1 ? [] :
-      this.allCmdSkills.filter(s => !sel.has(s.name) && s.name.toLowerCase().includes(q)).slice(0, 10);
-  }
-
-  onPasSkillSearch(): void {
-    const q = this.pasSearchQuery.toLowerCase().trim();
-    const sel = new Set(this.selectedPas.map(s => s.name));
-    this.pasSuggestions = q.length < 1 ? [] :
-      this.allPasSkills.filter(s => !sel.has(s.name) && s.name.toLowerCase().includes(q)).slice(0, 10);
-  }
-
-  addCmdSkill(s: SkillChoice): void { if (this.selectedCmd.length < 3) { this.selectedCmd.push(s); this.cmdSearchQuery = ''; this.cmdSuggestions = []; } }
-  addPasSkill(s: SkillChoice): void { if (this.selectedPas.length < 3) { this.selectedPas.push(s); this.pasSearchQuery = ''; this.pasSuggestions = []; } }
-  removeCmdSkill(n: string): void { this.selectedCmd = this.selectedCmd.filter(s => s.name !== n); }
-  removePasSkill(n: string): void { this.selectedPas = this.selectedPas.filter(s => s.name !== n); }
-
-  // ---- owned demons ----
-
-  addOwnedDemon(): void {
-    const name  = this.ownedDemonInput.trim();
-    const level = Number(this.ownedLevelInput);
-    if (!name || !level) { return; }
-    if (this.playerState.ownedDemons.some(d => d.name === name)) { return; }
-    this.playerState = { ...this.playerState,
-      ownedDemons: [...this.playerState.ownedDemons, { name, currentLevel: level, skills: [] }] };
-    this.ownedDemonInput = ''; this.ownedLevelInput = 1;
-    this.persistOwned();
-  }
-
-  removeOwnedDemon(name: string): void {
-    this.playerState = { ...this.playerState,
-      ownedDemons: this.playerState.ownedDemons.filter(d => d.name !== name) };
-    this.persistOwned();
-  }
-
-  private persistOwned(): void {
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.playerState.ownedDemons));
-  }
-
-  // ---- generator ----
-
-  generate(): void {
-    if (!this.compendium || !this.squareChart) { return; }
-    this.isSearching = true; this.results = []; this.strictFailures = [];
-    this.hasSearched = true; this.hasPartialResults = false;
-    setTimeout(() => this.runSearch(), 0);
-  }
-
-  private runSearch(): void {
-    if (!this.compendium || !this.squareChart) { this.isSearching = false; return; }
-
-    const requiredSkills = [
-      ...this.selectedCmd.map(s => s.name),
-      ...this.selectedPas.map(s => s.name),
-    ];
-
-    // Build a minimal RecipeGeneratorConfig from the FusionDataService.
-    const svc = this.fusionDataService as any;
-    const recipeConfig = {
-      fissionCalculator:    svc.fissionCalculator,
-      fusionCalculator:     svc.fusionCalculator,
-      triFissionCalculator: svc.triFissionCalculator || svc.fissionCalculator,
-      triFusionCalculator:  svc.triFusionCalculator  || svc.fusionCalculator,
-      races:                svc.compConfig?.races || [],
-      skillElems:           svc.compConfig?.skillElems || [],
-      inheritElems:         svc.compConfig?.skillElems || [],
-      displayElems:         {},
-      restrictInherits:     false,
-      defaultDemon:         this.targetDemonName,
-    };
-
-    const target: SkillTarget = {
-      targetDemon:    this.targetDemonName,
-      requiredSkills,
-      playerState:    this.playerState,
-      maxDepth:       3,
-      maxResults:     20,
-      rankStrategy:   this.rankStrategy,
-    };
-
-    try {
-      let results = searchFusionTree(target, this.compendium!, this.squareChart!, recipeConfig);
-
-      if (this.strictMode) {
-        // In strict mode: only chains where every skill has no blockers.
-        const strict = results.filter(r =>
-          r.blockers.length === 0 && r.ahOnlySkills.every(s => s.isReachableNow)
-        );
-        if (strict.length === 0) {
-          this.strictFailures = this.buildStrictFailures(requiredSkills, results);
-          this.results = [];
-        } else {
-          this.results = strict;
-        }
-      } else {
-        this.results = results;
-        this.hasPartialResults = results.some(r => r.blockers.length > 0);
-      }
-    } catch (e) {
-      console.error('Fusion tree search error:', e);
-      this.strictFailures = [{ skill: '(search error)', reason: String(e) }];
-    } finally {
-      this.isSearching = false;
-    }
-  }
-
-  private buildStrictFailures(
-    requiredSkills: string[],
-    allResults: RankedFusionResult[],
-  ): StrictFailureReason[] {
-    if (!this.compendium) { return []; }
-    return requiredSkills.map(skill => {
-      // Find what went wrong for each skill across all partial results.
-      const blocker = allResults
-        .flatMap(r => r.blockers)
-        .find(b => b.detail.includes(skill));
-      let reason = blocker?.detail || '';
-
-      if (!reason) {
-        const sk = this.compendium!.getSkill(skill);
-        if (!sk) {
-          reason = 'Skill not found in compendium dataset.';
-        } else if (sk.learnedBy.length === 0) {
-          reason = 'No demon in the dataset can carry this skill.';
-        } else if (sk.learnedBy.every(e => e.level > 99)) {
-          reason = 'This skill is AH-exclusive on all carriers — cannot be inherited. Must purchase directly.';
-        } else {
-          reason = 'No fusion path found that routes this skill to the target race. The target may not be reachable from demons that carry it, or slot caps are violated.';
-        }
-      }
-      return { skill, reason };
+    @Inject(FUSION_DATA_SERVICE) private fusionDataService: FusionDataService,
+    private cdr: ChangeDetectorRef
+  ) {
+    this.compendium = this.fusionDataService.compConfig as any;
+    this.sub = combineLatest([
+      this.fusionDataService.compendium,
+      this.fusionDataService.fusionChart
+    ]).subscribe(([comp, chart]) => {
+      this.compendium = comp;
+      this.fusionChart = chart;
+      this.clearTargetDemon();
     });
   }
 
-  // ---- template helpers ----
+  ngOnInit() {}
+  ngOnDestroy() { this.sub.unsubscribe(); }
 
-  isInnateOnTarget(skillName: string): boolean {
-    return this.targetInnateSet.has(skillName);
+  // -------------------------------------
+  // Demon Selection
+  // -------------------------------------
+  onDemonSearch() {
+    const q = this.demonSearchQuery.toLowerCase();
+    if (!q) {
+      this.demonSuggestions = [];
+      return;
+    }
+    this.demonSuggestions = this.compendium.allDemons.map(d => d.name)
+      .filter(n => n.toLowerCase().includes(q))
+      .sort((a, b) => a.length - b.length || a.localeCompare(b));
   }
 
-  getSkillSrc(skillName: string, node: FusionNode): string {
-    const level = node ? (this.compendium?.getDemon(node.demon)?.skills[skillName] ?? null) : null;
-    if (level === null || level === undefined) { return ''; }
-    if (level <= 0.9) { return 'innate'; }
-    if (level > 99)   { return 'AH'; }
-    return `Lv ${Math.round(level)}`;
+  selectTargetDemon(name: string) {
+    this.targetDemonObj = this.compendium.getDemon(name);
+    this.demonSearchQuery = '';
+    this.demonSuggestions = [];
+    this.buildProfile();
+  }
+
+  clearTargetDemon() {
+    this.targetDemonObj = null;
+    this.dpResults = [];
+    this.selectedResultIndex = 0;
+    this.searchFailed = false;
+    this.closeSkillPicker();
+  }
+
+  buildProfile() {
+    this.innateCmd = [];
+    this.innatePas = [];
+    this.innateRac = '';
+
+    if (!this.targetDemonObj) return;
+
+    const builder = new DemonProfileBuilder(this.compendium);
+    const profile = builder.buildProfile(this.targetDemonObj.name);
+    if (!profile) return;
+
+    this.innateCmd = profile.innateCmd;
+    this.innatePas = profile.innatePas;
+    this.innateRac = profile.innateRac;
+
+    this.freeCmdSlots = Array(profile.freeCmdCount).fill(null);
+    this.freePasSlots = Array(profile.freePasCount).fill(null);
+  }
+
+  getFilledSlotCount(slots: (string | null)[]): number {
+    return slots.filter(s => s !== null).length;
+  }
+
+  // -------------------------------------
+  // Skill Picker
+  // -------------------------------------
+  openSkillPicker(type: 'cmd' | 'pas', index: number) {
+    this.activePickerType = type;
+    this.activePickerIndex = index;
+    this.skillSearchQuery = '';
+    this.updateSkillSuggestions();
+  }
+
+  closeSkillPicker() {
+    this.activePickerType = null;
+    this.activePickerIndex = -1;
+  }
+
+  clearSlot(type: 'cmd' | 'pas', index: number, event: Event) {
+    event.stopPropagation();
+    if (type === 'cmd') {
+      this.freeCmdSlots[index] = null;
+    } else {
+      this.freePasSlots[index] = null;
+    }
+  }
+
+  onSkillSearch() {
+    this.updateSkillSuggestions();
+  }
+
+  updateSkillSuggestions() {
+    const q = this.skillSearchQuery.toLowerCase();
+    
+    // Get all skills matching the required type
+    const allSkills = this.compendium.allSkills.map(sk => sk.name).filter(skName => {
+      const skObj = this.compendium.getSkill(skName);
+      if (!skObj) return false;
+      
+      // Filter out auto skills and Auction House exclusives
+      if (skObj.element === 'aut' || skObj.element === 'auto' || skObj.element === 'rac') return false;
+      if (!this.isSkillAvailableNaturally(skName)) return false;
+      
+      // Match active type
+      const isPas = skObj.element === 'pas';
+      if (this.activePickerType === 'pas' && !isPas) return false;
+      if (this.activePickerType === 'cmd' && isPas) return false;
+
+      // Ensure it's not already innate
+      if (this.activePickerType === 'cmd' && this.innateCmd.includes(skName)) return false;
+      if (this.activePickerType === 'pas' && this.innatePas.includes(skName)) return false;
+
+      // Ensure it's not already in another free slot
+      if (this.activePickerType === 'cmd' && this.freeCmdSlots.includes(skName)) return false;
+      if (this.activePickerType === 'pas' && this.freePasSlots.includes(skName)) return false;
+
+      return !q || skName.toLowerCase().includes(q);
+    });
+
+    this.skillSuggestions = allSkills
+      .sort((a, b) => a.length - b.length || a.localeCompare(b))
+      .slice(0, 20); // show top 20
+  }
+
+  selectSkill(skillName: string) {
+    if (this.activePickerType === 'cmd') {
+      this.freeCmdSlots[this.activePickerIndex] = skillName;
+    } else if (this.activePickerType === 'pas') {
+      this.freePasSlots[this.activePickerIndex] = skillName;
+    }
+    this.closeSkillPicker();
+  }
+
+  // --- Owned Demons Methods ---
+  onOwnedDemonSearch() {
+    const q = this.ownedDemonSearchQuery.toLowerCase();
+    if (!q) {
+      this.ownedDemonSuggestions = [];
+      return;
+    }
+    this.ownedDemonSuggestions = this.compendium.allDemons.map(d => d.name)
+      .filter(n => n.toLowerCase().includes(q))
+      .sort((a, b) => a.length - b.length || a.localeCompare(b));
+  }
+
+  addOwnedDemon(name: string) {
+    this.ownedDemons.push({ name, skills: [] });
+    this.ownedDemonSearchQuery = '';
+    this.ownedDemonSuggestions = [];
+  }
+
+  removeOwnedDemon(index: number) {
+    this.ownedDemons.splice(index, 1);
+  }
+
+  removeOwnedSkill(demonIdx: number, skillIdx: number) {
+    this.ownedDemons[demonIdx].skills.splice(skillIdx, 1);
+  }
+
+  openOwnedSkillPicker(demonIdx: number) {
+    this.activeOwnedDemonIndex = demonIdx;
+    this.ownedSkillSearchQuery = '';
+    this.onOwnedSkillSearch();
+  }
+
+  closeOwnedSkillPicker() {
+    this.activeOwnedDemonIndex = null;
+  }
+
+  onOwnedSkillSearch() {
+    const q = this.ownedSkillSearchQuery.toLowerCase();
+    this.ownedSkillSuggestions = this.compendium.allSkills
+      .filter(s => s.element !== 'aut' && s.element !== 'auto' && s.element !== 'rac') // Can add passive or command
+      .map(s => s.name)
+      .filter(n => n.toLowerCase().includes(q))
+      .sort((a, b) => a.length - b.length || a.localeCompare(b))
+      .slice(0, 20);
+  }
+
+  selectOwnedSkill(skillName: string) {
+    if (this.activeOwnedDemonIndex !== null) {
+      if (!this.ownedDemons[this.activeOwnedDemonIndex].skills.includes(skillName)) {
+        this.ownedDemons[this.activeOwnedDemonIndex].skills.push(skillName);
+      }
+      this.closeOwnedSkillPicker();
+    }
+  }
+
+  // -------------------------------------
+  // DP Generator
+  // -------------------------------------
+  isSkillAvailableNaturally(skName: string): boolean {
+    for (const d of this.compendium.allDemons) {
+      for (const [s, lvl] of Object.entries(d.skills)) {
+        if (s === skName && lvl <= 99) return true;
+      }
+    }
+    return false;
+  }
+
+  getRequiredSkills(): string[] {
+    const skills: string[] = [];
+    this.freeCmdSlots.forEach(s => { if (s) skills.push(s); });
+    this.freePasSlots.forEach(s => { if (s) skills.push(s); });
+    return skills;
+  }
+
+  generate() {
+    const reqSkills = this.getRequiredSkills();
+    if (!this.targetDemonObj || reqSkills.length === 0) return;
+
+    this.isSearching = true;
+    this.dpResults = [];
+    this.selectedResultIndex = 0;
+    this.searchFailed = false;
+
+    // Use setTimeout to allow UI to render the "Computing..." state
+    setTimeout(() => {
+      try {
+        console.log("Starting solveMultiSkillFusion for:", this.targetDemonObj.name, "with skills:", reqSkills, "maxLevel:", this.playerMaxLevel);
+        const startTime = performance.now();
+        
+        const results: DPFusionResult[] = [];
+        const seenHashes = new Set<string>();
+
+        const runSolver = (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'min_summons') => {
+          const solver = new FusionDPSolver(this.compendium, this.fusionChart);
+          const res = solver.solveMultiSkillFusion(this.targetDemonObj.name, reqSkills, this.playerMaxLevel, criteria, this.ownedDemons);
+          if (res) {
+            // Deduplicate by graph structure
+            const hash = res.steps.map(s => s.result).join('|');
+            if (!seenHashes.has(hash)) {
+              seenHashes.add(hash);
+              results.push(res);
+            }
+          }
+        };
+
+        runSolver('min_level');
+        runSolver('min_fusions');
+        runSolver('min_ah');
+        runSolver('min_summons');
+
+        const endTime = performance.now();
+        console.log(`solveMultiSkillFusion (all passes) completed in ${(endTime - startTime).toFixed(2)}ms`);
+        
+        if (results.length > 0) {
+          this.dpResults = results;
+        } else {
+          console.warn("solveMultiSkillFusion returned null for all passes");
+          this.searchFailed = true;
+        }
+      } catch (e) {
+        console.error("solveMultiSkillFusion threw an error:", e);
+        this.searchFailed = true;
+      } finally {
+        this.isSearching = false;
+        this.cdr.markForCheck();
+      }
+    }, 50);
+  }
+
+  getNode(id: string): FusionGraphNode | undefined {
+    return this.dpResults[this.selectedResultIndex]?.graph.find(n => n.id === id);
+  }
+
+  getSkillAcquisition(demonName: string, skillName: string): string {
+    const demonObj = this.compendium.getDemon(demonName);
+    if (!demonObj) return '';
+    const slvl = demonObj.skills[skillName];
+    if (slvl === undefined) return ''; // Should not happen for base ingredients
+    
+    if (slvl < 1) return 'Innate';
+    if (slvl <= 99) return `Lv ${slvl}`;
+    
+    const tier = decodeAHSkillTier(slvl);
+    if (tier) {
+      return `${tier.charAt(0).toUpperCase() + tier.slice(1)} AH`;
+    }
+    return '';
   }
 }

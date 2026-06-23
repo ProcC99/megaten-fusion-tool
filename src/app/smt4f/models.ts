@@ -11,6 +11,7 @@ export interface Demon extends BaseDemon {
   evolvesTo?: FusionEntry;
   evolvesFrom?: FusionEntry;
   skillCards: { [skill: string]: number };
+  auctions?: { [skills: string]: number };
 }
 
 export interface Skill extends BaseSkill {

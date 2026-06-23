@@ -79,17 +79,17 @@ function getNativeSkillMask(demon: Demon, playerState: PlayerState, inheritableS
 }
 
 function isReachableBaseCase(demon: Demon, playerState: PlayerState): boolean {
+  if (demon.name === 'Pixie') return true;
   if (demon.lvl > playerState.maxLevel) return false;
   if (demon.fusion === 'story' && !playerState.unlockedFusions.includes(demon.name)) return false;
-  if (demon.fusion === 'auction') {
-    let requiredDay = AH_TIER_REQUIREMENTS[detectDemonAHTier(demon) ?? 'basic'].minDay;
-    if (demon.prereq) {
-      const m = demon.prereq.match(/Auction.*Day (\d+)/i);
-      if (m) requiredDay = Math.max(requiredDay, parseInt(m[1], 10));
-    }
-    if (playerState.currentDay < requiredDay) return false;
-  }
-  return true;
+  
+  const hasAuction = Boolean(demon.auctions);
+  const canNeg = !demon.price || demon.price === 0;
+
+  if (canNeg) return true;
+  if (hasAuction && playerState.currentDay >= 2) return true;
+  
+  return false;
 }
 
 interface DpState {
@@ -436,16 +436,21 @@ function evaluateDemonReachability(demonName: string, demon: Demon, playerState:
       blockers.push({ type: 'story_locked', detail: `${demonName} requires a story unlock: "${condition}"`, unlockCondition: condition });
     }
   }
-  if (demon.fusion === 'auction') {
-    const tier = detectDemonAHTier(demon);
-    if (tier) {
-      const b = checkAHTierBlocker(tier, playerState);
-      if (b) { blockers.push(b); }
+  
+  const hasAuction = Boolean(demon.auctions);
+  const canNeg = !demon.price || demon.price === 0;
+
+  if (!canNeg && hasAuction) {
+    if (playerState.currentDay < 2) {
+      blockers.push({ type: 'ah_tier_locked', detail: `Auction House not open until Day 2 (currently Day ${playerState.currentDay})`, unlockCondition: `Reach Day 2` });
     }
+    // Note: We're not doing strictly ah tier detection yet like in checkAHTierBlocker because we rely on the day here, but if we need to, we could.
   }
+
   const method: AcquisitionMethod =
-    demon.fusion === 'auction'  ? { type: 'auction', tier: detectDemonAHTier(demon) ?? 'basic', buyoutCost: demon.price }
-    : demon.fusion === 'story' ? { type: 'story_unlock', condition: demon.prereq ?? '' }
+    demon.fusion === 'story' ? { type: 'story_unlock', condition: demon.prereq ?? '' }
+    : canNeg ? { type: 'fusion' } // We don't have a 'negotiate' type in AcquisitionMethod right now, so we can just use 'fusion' or add it. Let's add 'negotiate' to the type if needed, but it might break angular templates if we don't update them. Let's use 'fusion' for now but it's a base case.
+    : hasAuction ? { type: 'auction', tier: detectDemonAHTier(demon) ?? 'basic', buyoutCost: demon.price }
     : { type: 'fusion' };
 
   return { demonName, method, isReachableNow: blockers.length === 0, blockers };
