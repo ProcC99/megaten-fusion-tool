@@ -14,6 +14,7 @@ import { Compendium } from '../../smt4f/models/compendium';
 import { FusionDPSolver, DPFusionResult, FusionGraphNode, OwnedDemon } from '../models/fusion-dp-solver';
 import { DemonProfileBuilder, DemonProfile } from '../models/demon-profile-builder';
 import { decodeAHSkillTier } from '../models/fusion-tree-types';
+import COMP_CONFIG_JSON from '../data/comp-config.json';
 
 export interface OwnedDemonUI {
   profile: DemonProfile;
@@ -57,6 +58,13 @@ export interface OwnedDemonUI {
       <div class="stat-box"><span>Ma</span><strong>{{ targetDemonObj.stats[4] }}</strong></div>
       <div class="stat-box"><span>Vi</span><strong>{{ targetDemonObj.stats[5] }}</strong></div>
       <div class="stat-box"><span>Ag</span><strong>{{ targetDemonObj.stats[6] }}</strong></div>
+    </div>
+
+    <div style="margin-bottom: 24px;">
+      <app-demon-resists
+        [resistHeaders]="resistHeaders"
+        [resists]="targetDemonObj.resists">
+      </app-demon-resists>
     </div>
 
     <div class="slots-container">
@@ -346,6 +354,7 @@ export interface OwnedDemonUI {
 export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   compendium: Compendium;
   sub: Subscription;
+  resistHeaders: string[] = COMP_CONFIG_JSON.resistElems;
 
   // Search State
   demonSearchQuery = '';
@@ -509,13 +518,27 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
       if (this.activePickerType === 'pas' && !isPas) return false;
       if (this.activePickerType === 'cmd' && isPas) return false;
 
+      // Determine which arrays to check against
+      let checkInnateCmd = this.innateCmd;
+      let checkInnatePas = this.innatePas;
+      let checkFreeCmd = this.freeCmdSlots;
+      let checkFreePas = this.freePasSlots;
+
+      if (this.activeOwnedDemonIndex !== null) {
+        const odUI = this.ownedDemonUIs[this.activeOwnedDemonIndex];
+        checkInnateCmd = odUI.profile.innateCmd;
+        checkInnatePas = odUI.profile.innatePas;
+        checkFreeCmd = odUI.freeCmdSlots;
+        checkFreePas = odUI.freePasSlots;
+      }
+
       // Ensure it's not already innate
-      if (this.activePickerType === 'cmd' && this.innateCmd.includes(skName)) return false;
-      if (this.activePickerType === 'pas' && this.innatePas.includes(skName)) return false;
+      if (this.activePickerType === 'cmd' && checkInnateCmd.includes(skName)) return false;
+      if (this.activePickerType === 'pas' && checkInnatePas.includes(skName)) return false;
 
       // Ensure it's not already in another free slot
-      if (this.activePickerType === 'cmd' && this.freeCmdSlots.includes(skName)) return false;
-      if (this.activePickerType === 'pas' && this.freePasSlots.includes(skName)) return false;
+      if (this.activePickerType === 'cmd' && checkFreeCmd.includes(skName)) return false;
+      if (this.activePickerType === 'pas' && checkFreePas.includes(skName)) return false;
 
       return !q || skName.toLowerCase().includes(q);
     });

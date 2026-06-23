@@ -9,6 +9,7 @@ import { SkillFusionGeneratorComponent } from './components/skill-fusion-generat
 
 import { COMPENDIUM_CONFIG, FUSION_DATA_SERVICE } from '../compendium/constants';
 import { Smt4CompendiumModule } from '../smt4f/smt4-compendium.module';
+import { SharedCompendiumModule } from '../compendium/compendium.module';
 import { CompendiumConfig, CompendiumConfigSet } from '../smt4f/models';
 import { skillRowToEffect } from '../pq2/models/skill-importer';
 
@@ -146,6 +147,7 @@ const SMT_COMP_CONFIG = createCompConfig();
     CommonModule,
     FormsModule,
     Smt4CompendiumModule,
+    SharedCompendiumModule,
     DesuCompendiumRoutingModule
   ],
   declarations: [
