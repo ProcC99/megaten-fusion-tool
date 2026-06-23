@@ -1,12 +1,14 @@
 name: Build & Deploy to Pages
 
 on:
-  # Run automatically on every push to this branch
   push:
     branches:
       - feature/desu-skill-fusion-tree
-  # Also allow manual trigger from the Actions tab
   workflow_dispatch:
+
+# Required for peaceiris/actions-gh-pages to push to the pages branch
+permissions:
+  contents: write
 
 jobs:
   build-and-deploy:
@@ -28,8 +30,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        # Uses the existing `build` script which already sets
-        # --aot --base-href /megaten-fusion-tool/
+        # npm run build already passes --aot --base-href /megaten-fusion-tool/
         run: npm run build
 
       - name: Deploy to pages branch
@@ -39,5 +40,4 @@ jobs:
           publish_dir: ./dist/megaten-fusion-tool
           publish_branch: pages
           force_orphan: false
-          # Keep a clean commit message
           commit_message: 'deploy: ${{ github.sha }}'
