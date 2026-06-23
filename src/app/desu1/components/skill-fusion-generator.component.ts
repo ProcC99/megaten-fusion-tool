@@ -19,6 +19,7 @@ export interface OwnedDemonUI {
   profile: DemonProfile;
   freeCmdSlots: (string | null)[];
   freePasSlots: (string | null)[];
+  isCollapsed?: boolean;
 }
 
 @Component({
@@ -128,12 +129,19 @@ export interface OwnedDemonUI {
     
     <div class="owned-demon-list">
        <div class="owned-demon-item-profile" *ngFor="let od of ownedDemonUIs; let odIdx = index">
-         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #2a2a2a; padding: 8px 12px; border-radius: 4px;">
-           <span style="font-size: 1.1rem; font-weight: bold; color: #a1d99b;">{{ od.profile.name }} <span style="font-size: 0.8rem; color: #aaa;">(Lv {{ od.profile.lvl }} {{ od.profile.race }})</span></span>
-           <button class="btn-remove-demon" (click)="removeOwnedDemon(odIdx)">✕ Remove</button>
+         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #2a2a2a; padding: 8px 12px; border-radius: 4px; cursor: pointer;" (click)="od.isCollapsed = !od.isCollapsed">
+           <span style="font-size: 1.1rem; font-weight: bold; color: #a1d99b; display: flex; align-items: center;">
+             <span style="display: inline-block; width: 20px; font-size: 0.9rem;">{{ od.isCollapsed ? '▶' : '▼' }}</span>
+             {{ od.profile.name }} 
+             <span style="font-size: 0.8rem; color: #aaa; margin-left: 6px;">(Lv {{ od.profile.lvl }} {{ od.profile.race }})</span>
+             <span *ngIf="od.isCollapsed" style="font-size: 0.8rem; color: #aaa; margin-left: 10px;">
+               [{{ getFilledSlotCount(od.freeCmdSlots) + od.profile.innateCmd.length }} Cmd, {{ getFilledSlotCount(od.freePasSlots) + od.profile.innatePas.length }} Pas]
+             </span>
+           </span>
+           <button class="btn-remove-demon" (click)="removeOwnedDemon(odIdx); $event.stopPropagation()">✕ Remove</button>
          </div>
 
-         <div class="slots-container" style="margin-top: 0;">
+         <div class="slots-container" style="margin-top: 0;" *ngIf="!od.isCollapsed">
             <!-- Command Skills -->
             <div class="slot-column">
               <h4>Command Skills ({{ getFilledSlotCount(od.freeCmdSlots) + od.profile.innateCmd.length }}/3)</h4>
@@ -600,8 +608,7 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
         const results: DPFusionResult[] = [];
         const seenHashes = new Map<string, DPFusionResult>();
         
-        // Map UI state to solver state
-        const solverOwnedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
+        const ownedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
           const skills = [
             ...ui.profile.innateCmd,
             ...ui.profile.innatePas,
@@ -611,9 +618,10 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
           return { name: ui.profile.name, skills };
         });
 
-        const runSolver = (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned', labelName: string) => {
+        const runSolver = (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned', labelName: string, ignoreOwned: boolean = false) => {
           const solver = new FusionDPSolver(this.compendium, this.fusionChart);
-          const res = solver.solveMultiSkillFusion(this.targetDemonObj.name, reqSkills, this.playerMaxLevel, criteria, solverOwnedDemons);
+          const activeOwnedDemons = ignoreOwned ? [] : ownedDemons;
+          const res = solver.solveMultiSkillFusion(this.targetDemonObj.name, reqSkills, this.playerMaxLevel, criteria, activeOwnedDemons);
           if (res) {
             // Deduplicate by graph structure but merge labels
             const hash = res.steps.map(s => s.result).join('|');
@@ -629,12 +637,11 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
         };
 
         runSolver('min_level', 'Lowest Level');
+        runSolver('min_level', 'Lowest Level (No Owned)', true);
         runSolver('min_fusions', 'Fewest Fusions');
         runSolver('min_ah', 'Fewest AH');
         runSolver('max_owned', 'Max Owned');
         
-        this.dpResults = results;
-
         const endTime = performance.now();
         console.log(`solveMultiSkillFusion (all passes) completed in ${(endTime - startTime).toFixed(2)}ms`);
         
