@@ -1,0 +1,43 @@
+name: Build & Deploy to Pages
+
+on:
+  # Run automatically on every push to this branch
+  push:
+    branches:
+      - feature/desu-skill-fusion-tree
+  # Also allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: feature/desu-skill-fusion-tree
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        # Uses the existing `build` script which already sets
+        # --aot --base-href /megaten-fusion-tool/
+        run: npm run build
+
+      - name: Deploy to pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist/megaten-fusion-tool
+          publish_branch: pages
+          force_orphan: false
+          # Keep a clean commit message
+          commit_message: 'deploy: ${{ github.sha }}'
