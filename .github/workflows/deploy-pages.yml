@@ -6,7 +6,6 @@ on:
       - feature/desu-skill-fusion-tree
   workflow_dispatch:
 
-# Required for peaceiris/actions-gh-pages to push to the pages branch
 permissions:
   contents: write
 
@@ -20,17 +19,15 @@ jobs:
         with:
           ref: feature/desu-skill-fusion-tree
 
-      - name: Set up Node 20
+      - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build
-        # npm run build already passes --aot --base-href /megaten-fusion-tool/
         run: npm run build
 
       - name: Deploy to pages branch
