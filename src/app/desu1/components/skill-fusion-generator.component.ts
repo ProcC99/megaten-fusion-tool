@@ -260,21 +260,21 @@ export interface OwnedDemonUI {
     h3 { margin: 0 0 12px; font-size: 1.1rem; color: #eee; }
     h4 { margin: 0 0 8px; font-size: 0.95rem; color: #aaa; border-bottom: 1px solid #333; padding-bottom: 4px; }
     
-    input[type=text], input[type=number] { background: #111; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 8px 10px; font-size: 0.9rem; }
-    .demon-search-input { width: 300px; }
+    input[type=text], input[type=number] { background: #111; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 8px 10px; font-size: 0.9rem; box-sizing: border-box; }
+    .demon-search-input { width: 100%; max-width: 300px; }
     .setting-input { width: 80px; text-align: center; }
     
-    .demon-suggestions, .picker-suggestions { list-style: none; margin: 4px 0 0; padding: 0; background: #222; border: 1px solid #555; border-radius: 4px; max-height: 200px; overflow-y: auto; position: absolute; z-index: 10; width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .demon-suggestions, .picker-suggestions { list-style: none; margin: 4px 0 0; padding: 0; background: #222; border: 1px solid #555; border-radius: 4px; max-height: 200px; overflow-y: auto; position: absolute; z-index: 10; width: 100%; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
     .suggestion-item, .picker-item { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #333; }
     .suggestion-item:hover, .picker-item:hover { background: #3a5c20; }
     
-    .profile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .profile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
     .profile-title h3 { margin: 0; font-size: 1.4rem; color: #fff; }
     .demon-meta { color: #88cc88; font-size: 0.9rem; }
     .btn-change { background: #444; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
     
-    .stats-row { display: flex; gap: 12px; margin-bottom: 24px; background: #111; padding: 12px; border-radius: 6px; }
-    .stat-box { display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .stats-row { display: flex; gap: 12px; margin-bottom: 24px; background: #111; padding: 12px; border-radius: 6px; flex-wrap: wrap; justify-content: space-around; }
+    .stat-box { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 40px; }
     .stat-box span { font-size: 0.75rem; color: #888; text-transform: uppercase; }
     .stat-box strong { font-size: 1.1rem; color: #eee; }
     
@@ -283,33 +283,34 @@ export interface OwnedDemonUI {
     .racial-column { flex: 0.5; min-width: 150px; }
     
     .slot { display: flex; align-items: center; padding: 8px 12px; margin-bottom: 8px; border-radius: 4px; font-size: 0.9rem; }
-    .slot-icon { margin-right: 8px; opacity: 0.6; }
+    .slot-icon { margin-right: 8px; opacity: 0.6; flex-shrink: 0; }
+    .slot-text { flex: 1; word-break: break-word; }
     .innate-slot { background: #111; border: 1px solid #333; color: #ccc; }
     .free-slot { background: #222; border: 1px dashed #555; color: #888; cursor: pointer; transition: all 0.2s; position: relative; }
     .free-slot:hover { border-color: #88cc88; background: #2a3a2a; color: #eee; }
     .free-slot.is-filled { border-style: solid; color: #eee; border-color: #444; }
     .free-slot.is-active { border-color: #7dff7d; background: #1a3c1a; }
     
-    .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; font-weight: bold; margin-left: auto; }
+    .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; font-weight: bold; margin-left: auto; flex-shrink: 0; }
     .badge-innate { background: #1a5c1a; color: #7dff7d; }
     
     .btn-clear-slot { position: absolute; right: 8px; background: transparent; border: none; color: #c55; cursor: pointer; font-size: 1rem; padding: 4px; }
     .btn-clear-slot:hover { color: #f55; }
     
     .skill-picker { background: #1a1a2e; border: 1px solid #7dff7d; border-radius: 6px; padding: 16px; margin-top: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.8); }
-    .picker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .picker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
     .picker-header h5 { margin: 0; color: #7dff7d; font-size: 1rem; }
     .btn-close-picker { background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 1.2rem; }
     .skill-picker-input { width: 100%; margin-bottom: 12px; }
     .picker-suggestions { position: static; width: 100%; max-height: 250px; }
     
-    .settings-row { display: flex; gap: 16px; align-items: center; }
-    .btn-generate { padding: 8px 16px; background: #c34242; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+    .settings-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .btn-generate { padding: 8px 16px; background: #c34242; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; flex: 1; min-width: 180px; }
     .btn-generate:hover { background: #d65151; }
     .btn-generate:disabled { opacity: 0.5; cursor: default; }
     
     .path-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-    .path-tab { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px 16px; cursor: pointer; text-align: left; transition: all 0.2s; }
+    .path-tab { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 10px 16px; cursor: pointer; text-align: left; transition: all 0.2s; flex: 1; min-width: 240px; }
     .path-tab:hover { background: #222; border-color: #555; }
     .path-tab.active { background: #2d5a2d; border-color: #a1d99b; }
     .tab-title { font-weight: bold; color: #fff; margin-bottom: 4px; }
@@ -317,12 +318,12 @@ export interface OwnedDemonUI {
     .path-tab.active .tab-stats { color: #d4f0ce; }
 
     /* Tree View */
-    .dp-tree-view { padding: 16px; background: #111; border-radius: 6px; border: 1px solid #333; }
+    .dp-tree-view { padding: 16px; background: #111; border-radius: 6px; border: 1px solid #333; overflow-x: auto; }
     .tree-root > .tree-node { margin-left: 0; border-left: none; padding-left: 0; }
     .tree-root > .tree-node::before { display: none; }
     .tree-node { margin: 8px 0 8px 24px; border-left: 2px solid #444; padding-left: 16px; position: relative; }
     .tree-node::before { content: ''; position: absolute; left: 0; top: 16px; width: 16px; height: 2px; background: #444; }
-    .node-info { background: #222; padding: 6px 12px; border-radius: 4px; display: inline-block; border: 1px solid #333; }
+    .node-info { background: #222; padding: 6px 12px; border-radius: 4px; display: inline-block; border: 1px solid #333; white-space: nowrap; }
     .step-badge { background: #444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase; margin-right: 8px; font-weight: bold; }
     .tree-root    .tree-node.is-natural .node-info { border-style: dashed; border-color: #555; background: #1a1a1a; }
     .tree-node.is-natural:has(.node-label:contains("(Owned)")) .node-info { border-style: solid; border-color: #2d5a2d; background: #162416; }
