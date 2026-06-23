@@ -197,8 +197,8 @@ export interface OwnedDemonUI {
     <h3>Player Level</h3>
     <div class="settings-row">
       <input type="number" [(ngModel)]="playerMaxLevel" min="1" max="99" class="setting-input" />
-      <button class="btn-generate" (click)="generate()" [disabled]="isSearching">
-        {{ isSearching ? 'Computing Path...' : 'Generate DP Recipe' }}
+      <button class="btn-generate" (click)="generate()" [disabled]="!targetDemonObj || isSearching">
+        {{ isSearching ? 'Computing...' : 'Generate DP Recipe' }}
       </button>
     </div>
   </section>
@@ -592,7 +592,7 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
 
   generate() {
     const reqSkills = this.getRequiredSkills();
-    if (!this.targetDemonObj || reqSkills.length === 0) return;
+    if (!this.targetDemonObj) return;
 
     this.isSearching = true;
     this.dpResults = [];

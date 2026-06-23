@@ -147,7 +147,8 @@ export class FusionDPSolver {
     requiredSkills: string[], 
     maxPlayerLevel: number = 99,
     criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned' = 'min_level',
-    ownedDemons: OwnedDemon[] = []
+    ownedDemons: OwnedDemon[] = [],
+    ignoreOwned: boolean = false
   ): DPFusionResult | null {
     const bestMap = new Map<string, DPState>();
     const pq: DPState[] = [];
@@ -203,22 +204,24 @@ export class FusionDPSolver {
     }
 
     // Custom Owned Demons
-    for (let i = 0; i < ownedDemons.length; i++) {
-      const owned = ownedDemons[i];
-      const relevantSkills = owned.skills.filter(s => skillList.includes(s));
-      pushState({
-        demon: owned.name,
-        skills: relevantSkills,
-        maxLevel: this.getDemonLevel(owned.name),
-        cost: 0,
-        ahCount: 0,
-        maccaCost: 0,
-        summonCount: 0,
-        ownedCount: 1,
-        ownedMask: 1 << i,
-        isOwned: true,
-        recipe: null
-      });
+    if (!ignoreOwned) {
+      for (let i = 0; i < ownedDemons.length; i++) {
+        const owned = ownedDemons[i];
+        const relevantSkills = owned.skills.filter(s => skillList.includes(s));
+        pushState({
+          demon: owned.name,
+          skills: relevantSkills,
+          maxLevel: this.getDemonLevel(owned.name),
+          cost: 0,
+          ahCount: 0,
+          maccaCost: 0,
+          summonCount: 0,
+          ownedCount: 1,
+          ownedMask: 1 << i,
+          isOwned: true,
+          recipe: null
+        });
+      }
     }
 
     const sortPQ = () => {
@@ -257,9 +260,9 @@ export class FusionDPSolver {
 
       const forwardFusions = SMT_NORMAL_FUSION_CALCULATOR.getFusions(current.demon, this.comp as any, this.chart as any);
 
-      for (const f of forwardFusions) {
-        const resultDemon = f.name2;
-        const ingredientB = f.name1; 
+        for (const f of forwardFusions) {
+          const ingredientB = f.name1;
+          const resultDemon = f.name2; 
 
         // Validate result demon
         const resDemonObj = this.comp.getDemon(resultDemon);
@@ -276,8 +279,6 @@ export class FusionDPSolver {
           if (bState) {
             if (current.ownedMask !== 0 && bState.ownedMask !== 0 && (current.ownedMask & bState.ownedMask) !== 0) continue;
             const mergedSkills = Array.from(new Set([...current.skills, ...bState.skills])).sort();
-            if (mergedSkills.length === 0) continue; 
-            
             // Validate slot limit constraint
             let cmdCount = 0;
             let pasCount = 0;
