@@ -6,7 +6,7 @@ import Translations from './compendium/data/translations.json';
   selector: 'app-root',
   template: `
     <div [ngClass]="currentGame">
-      <table style="margin-left: auto; margin-right: auto; width: 1080px;">
+      <table style="margin-left: auto; margin-right: auto; width: 100%; max-width: 1080px;">
         <thead>
           <tr>
             <th *ngFor="let link of msgs.HomeLink; index as i" [routerLink]="link" class="nav" routerLinkActive="active" [style.width]="navWidth">
