@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 
 import { SharedModule } from '../shared/shared.module';
 import { SharedCompendiumModule } from '../compendium/compendium.module';
-import { CompendiumRoutingModule } from './compendium-routing.module';
+
 
 import { CompendiumComponent } from './components/compendium.component';
 import { DemonListContainerComponent } from './components/demon-list.component';
@@ -19,8 +19,7 @@ import { P1FusionTableComponent } from './components/p1-fusion-table.component';
   imports: [
     CommonModule,
     SharedModule,
-    SharedCompendiumModule,
-    CompendiumRoutingModule
+    SharedCompendiumModule
   ],
   declarations: [
     CompendiumComponent,

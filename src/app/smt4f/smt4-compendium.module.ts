@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 
 import { SharedModule } from '../shared/shared.module';
 import { SharedCompendiumModule } from '../compendium/compendium.module';
-import { CompendiumRoutingModule } from './compendium-routing.module';
+
 
 import { CompendiumComponent } from './components/compendium.component';
 import { DemonListContainerComponent } from './components/demon-list.component';
@@ -21,8 +21,7 @@ import { DemonPasswordComponent } from './components/demon-password-component';
     CommonModule,
     SharedModule,
     ReactiveFormsModule,
-    SharedCompendiumModule,
-    CompendiumRoutingModule
+    SharedCompendiumModule
   ],
   declarations: [
     CompendiumComponent,

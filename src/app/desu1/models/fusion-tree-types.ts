@@ -150,34 +150,22 @@ export interface OwnedDemon {
  * can supply just the fields they care about.
  */
 export interface PlayerState {
-  /** Current in-game day (1–8). Controls story unlocks and AH tier gating. */
   currentDay: number;
-  /** Current Macca rating score (determines AH tier access). */
   currentRating: number;
-  /**
-   * AH tiers the player has ALREADY purchased (paid the unlock cost).
-   * Even if the day + rating threshold is met, the player must have
-   * explicitly bought the tier.
-   */
   ahTiersUnlocked: AHTier[];
-  /**
-   * Demons confirmed available via story-route unlocks.
-   * Matches the `conditions` keys in *-demon-unlocks.json.
-   */
   unlockedFusions: string[];
-  /** The player's actual current roster with real levels. */
   ownedDemons: OwnedDemon[];
-  /** Optional: filter out paths whose total cost exceeds this value. */
+  maxLevel: number;
   maxMacca?: number;
 }
 
-/** Sensible defaults — a fresh Day 1 player with an empty roster. */
 export const DEFAULT_PLAYER_STATE: PlayerState = {
   currentDay: 1,
   currentRating: 0,
   ahTiersUnlocked: ['basic'],
   unlockedFusions: [],
   ownedDemons: [],
+  maxLevel: 99,
 };
 
 // ---------------------------------------------------------------------------
@@ -221,6 +209,8 @@ export interface FusionNode {
   totalCost: number;
   /** Depth from this node down to the deepest leaf. */
   depth: number;
+  /** True if this node is a leaf that is currently owned by the player. */
+  isOwned?: boolean;
   /** Reachability verdict for the DEMON at this node. */
   reachability: DemonReachability;
   /**

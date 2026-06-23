@@ -29,6 +29,9 @@ export class CompendiumComponent {
         { title: 'Passwords', link: 'passwords' } :
         { title: translateComp(Translations.CompendiumComponent.RecipGenerator, lang), link: 'recipes' }
       ];
+      if (this.appCssClasses.includes('dso')) {
+        this.otherLinks.push({ title: 'Skill Recipe', link: 'skill-recipe' });
+      }
     }
   }
 }

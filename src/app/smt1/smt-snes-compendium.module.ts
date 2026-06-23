@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 
 import { SharedModule } from '../shared/shared.module';
 import { SharedCompendiumModule } from '../compendium/compendium.module';
-import { CompendiumRoutingModule } from './compendium-routing.module';
+
 
 import { DemonListContainerComponent } from './components/demon-list.component';
 import { SkillListContainerComponent } from './components/skill-list.component';
@@ -17,8 +17,7 @@ import { CompendiumComponent } from './components/compendium.component';
   imports: [
     CommonModule,
     SharedModule,
-    SharedCompendiumModule,
-    CompendiumRoutingModule
+    SharedCompendiumModule
   ],
   declarations: [
     CompendiumComponent,

@@ -118,9 +118,24 @@ interface StrictFailureReason {
     </div>
   </section>
 
-  <!-- 3. Owned demons -->
+  <!-- 3. Player Settings -->
+  <section class="panel settings-panel" *ngIf="targetDemonName">
+    <h3>3. Player Settings</h3>
+    <div class="settings-row">
+      <label class="setting-label">
+        Player Level:
+        <input type="number" [(ngModel)]="playerState.maxLevel" min="1" max="99" class="setting-input" />
+      </label>
+      <label class="setting-label">
+        In-game Day:
+        <input type="number" [(ngModel)]="playerState.currentDay" min="1" max="8" class="setting-input" />
+      </label>
+    </div>
+  </section>
+
+  <!-- 4. Owned demons -->
   <section class="panel owned-panel" *ngIf="targetDemonName">
-    <h3>3. Owned Demons <span class="hint">(optional — biases solver toward shorter chains)</span></h3>
+    <h3>4. Owned Demons <span class="hint">(optional — biases solver toward shorter chains)</span></h3>
     <div class="owned-input-row">
       <input type="text" placeholder="Demon name" [(ngModel)]="ownedDemonInput" class="owned-demon-input" />
       <input type="number" placeholder="Lv" [(ngModel)]="ownedLevelInput" min="1" max="99" class="owned-level-input" />
@@ -134,9 +149,9 @@ interface StrictFailureReason {
     </ul>
   </section>
 
-  <!-- 4. Controls -->
+  <!-- 5. Controls -->
   <section class="panel controls-panel" *ngIf="targetDemonName">
-    <h3>4. Generate</h3>
+    <h3>5. Generate</h3>
     <div class="controls-row">
       <label class="toggle-label">
         <input type="checkbox" [(ngModel)]="strictMode" />
@@ -200,7 +215,7 @@ interface StrictFailureReason {
     </div>
   </section>
 
-  <section class="panel empty-state" *ngIf="hasSearched && results.length === 0 && strictFailures.length === 0">
+  <section class="panel empty-state" *ngIf="hasSearched && !isSearching && results.length === 0 && strictFailures.length === 0">
     <p>No fusion paths found. Try relaxing skill requirements or switching to Best Effort mode.</p>
   </section>
 
@@ -261,6 +276,9 @@ interface StrictFailureReason {
     .btn-generate:disabled{opacity:.5;cursor:default}
     .controls-row{display:flex;align-items:center;flex-wrap:wrap;gap:16px}
     .toggle-label,.rank-label{font-size:.9rem;color:#ccc}
+    .settings-row{display:flex;gap:16px;align-items:center;margin-top:8px}
+    .setting-label{font-size:.9rem;color:#ccc;display:flex;align-items:center;gap:8px}
+    .setting-input{width:60px;text-align:center}
     .owned-input-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
     .owned-list{list-style:none;margin:0;padding:0}
     .owned-item{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.88rem}

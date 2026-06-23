@@ -1,28 +1,6 @@
 /**
- * fusion-tree-search.ts  (rewritten)
+ * fusion-tree-search.ts (Bidirectional DP Hypergraph Shortest Path)
  * -----------------------------------------------------------------
- * Skill-targeted fusion path explorer for Devil Survivor Overclocked.
- *
- * Key change vs the scaffolded version
- * -------------------------------------
- * enumerateSkillPartitions() now enforces the 3 CMD / 3 PAS slot cap
- * per parent demon:
- *
- *   A parent can carry a desired skill into the fusion if EITHER:
- *     (a) it already has the skill in its own skill list, OR
- *     (b) it has a free slot of the correct type (CMD or PAS) that
- *         one of ITS OWN parents can fill via inheritance.
- *
- *   Free slots  = 3 − (number of non-racial skills already on the demon)
- *   PAS skills  = element 'aut' in the compendium, OR Skill.inherit
- *                 being one of the known passive element tags.
- *   Racial skill occupies slot 7 and is excluded entirely.
- *
- * Skill value encoding (ove-demon-data.json)
- * ------------------------------------------
- *   0.1 – 0.3  innate skill slot  (always occupies a slot)
- *   2 – 99     level-up skill     (occupies a slot once learned)
- *   > 99       AH-exclusive       CANNOT be inherited
  */
 
 import {
@@ -31,7 +9,6 @@ import {
   SquareChart,
   RecipeGeneratorConfig,
   Demon,
-  Skill,
 } from '../../compendium/models';
 import {
   AHTier,
@@ -39,10 +16,8 @@ import {
   AcquisitionMethod,
   DemonReachability,
   FusionNode,
-  OwnedDemon,
   PlayerState,
   RankedFusionResult,
-  RankStrategy,
   ReachabilityBlocker,
   ReachabilityTier,
   SkillReachability,
@@ -51,35 +26,14 @@ import {
   isAHExclusiveSkill,
 } from './fusion-tree-types';
 
-// ---------------------------------------------------------------------------
-// Slot helpers
-// ---------------------------------------------------------------------------
-
-/** Passive-type element tags used in the DSO skill data. */
 const PASSIVE_ELEMENTS = new Set(['aut', 'pas', 'auto']);
 
-/**
- * Returns true when a skill should go into the PAS (passive) bucket.
- * Relies on Skill.element — for DSO this is 'aut' for Auto-type skills.
- * Fallback: if element is undefined we conservatively treat it as CMD.
- */
 function isPassiveSkill(comp: Compendium, skillName: string): boolean {
   const sk = comp.getSkill(skillName);
   if (!sk) { return false; }
   return PASSIVE_ELEMENTS.has((sk.element || '').toLowerCase());
 }
 
-/**
- * Counts how many CMD and PAS slots a demon's current skill list
- * already occupies (excluding the fixed Racial slot which is index 7
- * and encoded separately by the compendium).
- *
- * Rules:
- *   • AH-exclusive skills (level > 99) occupy a slot (they're real skills).
- *   • Innate skills (0.x) occupy a slot.
- *   • Level-up skills (2–99) occupy a slot once learned — we count them
- *     all conservatively (player will level the demon before fusing).
- */
 function demonSlotUsage(demon: Demon, comp: Compendium): { usedCmd: number; usedPas: number } {
   let usedCmd = 0;
   let usedPas = 0;
@@ -93,387 +47,392 @@ function demonSlotUsage(demon: Demon, comp: Compendium): { usedCmd: number; used
   return { usedCmd, usedPas };
 }
 
-/** Free CMD and PAS inheritance slots available on a demon. */
-function freeSlots(demon: Demon, comp: Compendium): { freeCmd: number; freePas: number } {
+function checkSlots(demon: Demon, inheritedMask: number, comp: Compendium, inheritableSkills: string[]): boolean {
+  if (inheritedMask === 0) return true;
   const { usedCmd, usedPas } = demonSlotUsage(demon, comp);
-  return {
-    freeCmd: Math.max(0, 3 - usedCmd),
-    freePas: Math.max(0, 3 - usedPas),
-  };
+  const freeCmd = Math.max(0, 3 - usedCmd);
+  const freePas = Math.max(0, 3 - usedPas);
+
+  let neededCmd = 0;
+  let neededPas = 0;
+  for (let i = 0; i < inheritableSkills.length; i++) {
+    if ((inheritedMask & (1 << i)) !== 0) {
+      if (isPassiveSkill(comp, inheritableSkills[i])) neededPas++;
+      else neededCmd++;
+    }
+  }
+  return neededCmd <= freeCmd && neededPas <= freePas;
 }
 
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
+function getNativeSkillMask(demon: Demon, playerState: PlayerState, inheritableSkills: string[]): number {
+  let mask = 0;
+  for (let i = 0; i < inheritableSkills.length; i++) {
+    const s = inheritableSkills[i];
+    const lvl = demon.skills[s];
+    if (lvl !== undefined && !isAHExclusiveSkill(lvl)) {
+       if (lvl <= 0.9 || Math.round(lvl) <= playerState.maxLevel) {
+          mask |= (1 << i);
+       }
+    }
+  }
+  return mask;
+}
 
-/**
- * Search the fusion graph for paths that produce `target.targetDemon`
- * while carrying all `target.requiredSkills` into the final demon.
- *
- * Returns at most `target.maxResults` results ranked by `target.rankStrategy`.
- */
+function isReachableBaseCase(demon: Demon, playerState: PlayerState): boolean {
+  if (demon.lvl > playerState.maxLevel) return false;
+  if (demon.fusion === 'story' && !playerState.unlockedFusions.includes(demon.name)) return false;
+  if (demon.fusion === 'auction') {
+    const tier = detectDemonAHTier(demon) ?? 'basic';
+    const req = AH_TIER_REQUIREMENTS[tier];
+    if (playerState.currentDay < req.minDay) return false;
+  }
+  return true;
+}
+
+interface DpState {
+  demonName: string;
+  mask: number;
+  cost: number;
+  left?: DpState;
+  right?: DpState;
+  depth: number;
+  isOwned: boolean;
+}
+
+class PriorityQueue<T> {
+  private data: T[] = [];
+  constructor(private compare: (a: T, b: T) => number) {}
+  push(item: T) {
+    this.data.push(item);
+    this.bubbleUp(this.data.length - 1);
+  }
+  pop(): T {
+    const top = this.data[0];
+    const bottom = this.data.pop();
+    if (this.data.length > 0 && bottom !== undefined) {
+      this.data[0] = bottom;
+      this.sinkDown(0);
+    }
+    return top as T;
+  }
+  isEmpty() { return this.data.length === 0; }
+  private bubbleUp(n: number) {
+    const item = this.data[n];
+    while (n > 0) {
+      const p = Math.floor((n - 1) / 2);
+      if (this.compare(item, this.data[p]) >= 0) break;
+      this.data[n] = this.data[p];
+      n = p;
+    }
+    this.data[n] = item;
+  }
+  private sinkDown(n: number) {
+    const len = this.data.length;
+    const item = this.data[n];
+    while (true) {
+      const left = 2 * n + 1;
+      const right = 2 * n + 2;
+      let swap = -1;
+      if (left < len && this.compare(this.data[left], item) < 0) swap = left;
+      if (right < len && this.compare(this.data[right], swap === -1 ? item : this.data[left]) < 0) swap = right;
+      if (swap === -1) break;
+      this.data[n] = this.data[swap];
+      n = swap;
+    }
+    this.data[n] = item;
+  }
+}
+
 export function searchFusionTree(
   target: SkillTarget,
   comp: Compendium,
   squareChart: SquareChart,
   recipeConfig: RecipeGeneratorConfig,
 ): RankedFusionResult[] {
-  const { targetDemon, requiredSkills, playerState, maxDepth, maxResults, rankStrategy } = target;
+  const { targetDemon, requiredSkills, playerState, maxResults } = target;
   const { normalChart } = squareChart;
 
-  // Separate AH-only skills — cannot be routed via fusion.
   const ahOnlySkillNames = requiredSkills.filter(s => isSkillAHOnly(s, comp));
   const inheritableSkills  = requiredSkills.filter(s => !isSkillAHOnly(s, comp));
+  const N = inheritableSkills.length;
+  const ALL_SKILLS = (1 << N) - 1;
 
-  const ahOnlyReachability = ahOnlySkillNames.map(s =>
-    buildAHSkillReachability(s, comp, playerState),
-  );
+  // 1. Precompute Forward Fusions
+  const forwardFusions: Record<string, { partner: string, result: string }[]> = {};
+  for (const resultDemon of comp.allDemons) {
+    if (resultDemon.isEnemy) continue;
+    const fissions = recipeConfig.fissionCalculator.getFusions(resultDemon.name, comp, normalChart);
+    for (const pair of fissions) {
+      const A = pair.name1;
+      const B = pair.name2;
+      if (A === resultDemon.name || B === resultDemon.name) continue;
+      
+      if (!forwardFusions[A]) forwardFusions[A] = [];
+      forwardFusions[A].push({ partner: B, result: resultDemon.name });
 
-  const roots = collectFusionNodes(
-    targetDemon,
-    inheritableSkills,
-    playerState,
-    comp,
-    normalChart,
-    recipeConfig,
-    maxDepth,
-    0,
-    new Set<string>(),
-  );
+      if (A !== B) {
+        if (!forwardFusions[B]) forwardFusions[B] = [];
+        forwardFusions[B].push({ partner: A, result: resultDemon.name });
+      }
+    }
+  }
 
-  return rankAndWrap(roots, ahOnlyReachability, rankStrategy, maxResults);
-}
+  // 2. Initialize DP Table
+  const dist: Record<string, Record<number, number>> = {};
+  const best: Record<string, Record<number, DpState>> = {};
+  const activeMasks: Record<string, number[]> = {};
 
-// ---------------------------------------------------------------------------
-// Core recursive collector
-// ---------------------------------------------------------------------------
+  for (const d of comp.allDemons) {
+    dist[d.name] = {};
+    best[d.name] = {};
+    activeMasks[d.name] = [];
+    for (let m = 0; m <= ALL_SKILLS; m++) dist[d.name][m] = Infinity;
+  }
 
-function collectFusionNodes(
-  demonName: string,
-  requiredSkills: string[],
-  playerState: PlayerState,
-  comp: Compendium,
-  chart: FusionChart,
-  recipeConfig: RecipeGeneratorConfig,
-  maxDepth: number,
-  currentDepth: number,
-  visited: Set<string>,
-): FusionNode[] {
-  const results: FusionNode[] = [];
+  type PqItem = { cost: number, name: string, mask: number };
+  const pq = new PriorityQueue<PqItem>((a, b) => a.cost - b.cost);
 
-  if (visited.has(demonName) || currentDepth > maxDepth) { return results; }
+  function relax(name: string, mask: number, cost: number, state: DpState) {
+    for (let sub = mask; sub >= 0; sub = (sub - 1) & mask) {
+      if (cost < dist[name][sub]) {
+        if (dist[name][sub] === Infinity) activeMasks[name].push(sub);
+        dist[name][sub] = cost;
+        best[name][sub] = { ...state, mask: sub };
+        pq.push({ cost, name, mask: sub });
+      }
+      if (sub === 0) break;
+    }
+  }
 
-  const demon = comp.getDemon(demonName);
-  if (!demon) { return results; }
+  // 3. Base Cases
+  for (const demon of comp.allDemons) {
+    if (demon.isEnemy) continue;
+    
+    // Check owned
+    const owned = playerState.ownedDemons.find(d => d.name === demon.name);
+    let baseMask = 0;
+    
+    if (owned) {
+      for (let i = 0; i < N; i++) {
+        if (owned.skills.includes(inheritableSkills[i]) || 
+            (demon.skills[inheritableSkills[i]] !== undefined && demon.skills[inheritableSkills[i]] <= 0.9) ||
+            (demon.skills[inheritableSkills[i]] !== undefined && Math.round(demon.skills[inheritableSkills[i]]) <= owned.currentLevel)) {
+           baseMask |= (1 << i);
+        }
+      }
+      relax(demon.name, baseMask, 0, { demonName: demon.name, mask: baseMask, cost: 0, depth: 0, isOwned: true });
+    }
 
-  // Enumerate all fusion pairs that produce this demon.
-  const pairs = recipeConfig.fissionCalculator
-    .getFusions(demonName, comp, chart)
-    .filter(p =>
-      p.name1 !== demonName &&
-      p.name2 !== demonName &&
-      !visited.has(p.name1) &&
-      !visited.has(p.name2),
-    );
+    if (isReachableBaseCase(demon, playerState)) {
+      const nativeMask = getNativeSkillMask(demon, playerState, inheritableSkills);
+      relax(demon.name, nativeMask, demon.price, { demonName: demon.name, mask: nativeMask, cost: demon.price, depth: 0, isOwned: false });
+    }
+  }
 
-  for (const pair of pairs) {
-    const leftDemon  = comp.getDemon(pair.name1);
-    const rightDemon = comp.getDemon(pair.name2);
-    if (!leftDemon || !rightDemon) { continue; }
+  // 4. Dijkstra Loop
+  while (!pq.isEmpty()) {
+    const { cost: costA, name: nameA, mask: maskA } = pq.pop();
+    if (costA > dist[nameA][maskA]) continue;
 
-    // Enumerate all SLOT-CAP-VALID skill partitions between the two parents.
-    const partitions = enumerateSkillPartitions(
-      requiredSkills, leftDemon, rightDemon, comp,
-    );
-    if (partitions.length === 0) { continue; }
+    const fusions = forwardFusions[nameA] || [];
+    for (const { partner: nameB, result: nameC } of fusions) {
+      const demonC = comp.getDemon(nameC);
+      if (!demonC || demonC.lvl > playerState.maxLevel) continue;
+      
+      const nativeMaskC = getNativeSkillMask(demonC, playerState, inheritableSkills);
 
-    for (const { leftSkills, rightSkills } of partitions) {
-      const nextVisited = new Set(visited).add(demonName);
+      for (const maskB of activeMasks[nameB]) {
+        const costB = dist[nameB][maskB];
+        const newCost = costA + costB + demonC.price;
+        const combinedMask = maskA | maskB | nativeMaskC;
 
-      const leftNodes = findSkillSourceNodes(
-        pair.name1, leftSkills, playerState, comp, chart, recipeConfig,
-        maxDepth, currentDepth + 1, nextVisited,
-      );
-      const rightNodes = findSkillSourceNodes(
-        pair.name2, rightSkills, playerState, comp, chart, recipeConfig,
-        maxDepth, currentDepth + 1, nextVisited,
-      );
+        if (newCost >= dist[nameC][combinedMask]) continue;
 
-      for (const leftNode of leftNodes) {
-        for (const rightNode of rightNodes) {
-          results.push(buildInteriorNode(
-            demonName, demon, requiredSkills,
-            leftNode, rightNode,
-            comp, playerState,
-          ));
+        const inheritedMask = (maskA | maskB) & (~nativeMaskC);
+        if (!checkSlots(demonC, inheritedMask, comp, inheritableSkills)) continue;
+
+        const bestA = best[nameA][maskA];
+        const bestB = best[nameB][maskB];
+
+        relax(nameC, combinedMask, newCost, {
+          demonName: nameC,
+          mask: combinedMask,
+          cost: newCost,
+          left: bestA,
+          right: bestB,
+          depth: Math.max(bestA.depth, bestB.depth) + 1,
+          isOwned: false
+        });
+      }
+    }
+  }
+
+  // 5. Build Top Results
+  const finalPaths: { a?: DpState, b?: DpState, cost: number, state?: DpState }[] = [];
+  const targetNative = getNativeSkillMask(comp.getDemon(targetDemon), playerState, inheritableSkills);
+  
+  // Direct buy/own
+  if (dist[targetDemon][ALL_SKILLS] !== Infinity) {
+    const bestDirect = best[targetDemon][ALL_SKILLS];
+    if (!bestDirect.left && !bestDirect.right) {
+       finalPaths.push({ cost: bestDirect.cost, state: bestDirect });
+    }
+  }
+
+  const targetFissions = recipeConfig.fissionCalculator.getFusions(targetDemon, comp, normalChart);
+  for (const pair of targetFissions) {
+    const nameA = pair.name1;
+    const nameB = pair.name2;
+    if (comp.getDemon(nameA).lvl > playerState.maxLevel || comp.getDemon(nameB).lvl > playerState.maxLevel) continue;
+
+    for (const maskA of activeMasks[nameA]) {
+      for (const maskB of activeMasks[nameB]) {
+        if ((maskA | maskB | targetNative) === ALL_SKILLS) {
+          const inheritedMask = (maskA | maskB) & (~targetNative);
+          if (checkSlots(comp.getDemon(targetDemon), inheritedMask, comp, inheritableSkills)) {
+             const cost = dist[nameA][maskA] + dist[nameB][maskB] + comp.getDemon(targetDemon).price;
+             finalPaths.push({
+               a: best[nameA][maskA],
+               b: best[nameB][maskB],
+               cost
+             });
+          }
         }
       }
     }
   }
 
-  // Special (fixed-ingredient) fusions.
-  const specIngreds = comp.getSpecialNameEntries(demonName);
-  if (specIngreds.length > 1) {
-    results.push(...buildSpecialFusionNodes(
-      demonName, demon, specIngreds, requiredSkills,
-      playerState, comp,
-    ));
+  finalPaths.sort((x, y) => x.cost - y.cost);
+  
+  // Deduplicate
+  const seenKeys = new Set<string>();
+  const uniquePaths = [];
+  for (const p of finalPaths) {
+    let key = '';
+    if (p.state) { key = p.state.demonName + '_direct'; }
+    else {
+      const a = p.a!.demonName; const b = p.b!.demonName;
+      key = a < b ? `${a}_${b}` : `${b}_${a}`;
+    }
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniquePaths.push(p);
+    }
+  }
+
+  const results: RankedFusionResult[] = [];
+  let rank = 1;
+
+  for (const p of uniquePaths.slice(0, maxResults)) {
+    let rootNode: FusionNode;
+    const demon = comp.getDemon(targetDemon);
+
+    if (p.state) {
+      rootNode = buildNodeFromDpState(p.state, requiredSkills, comp, playerState, inheritableSkills);
+    } else {
+      const leftNode = buildNodeFromDpState(p.a!, inheritableSkills, comp, playerState, inheritableSkills);
+      const rightNode = buildNodeFromDpState(p.b!, inheritableSkills, comp, playerState, inheritableSkills);
+      const reachability = evaluateDemonReachability(targetDemon, demon, playerState);
+      const skillReach = requiredSkills.map(s => evaluateSkillReachability(s, targetDemon, demon, playerState));
+      rootNode = {
+        demon: targetDemon,
+        skillsContributed: requiredSkills,
+        left: leftNode,
+        right: rightNode,
+        inheritMask: leftNode.inheritMask | rightNode.inheritMask,
+        totalCost: p.cost,
+        depth: Math.max(leftNode.depth, rightNode.depth) + 1,
+        reachability,
+        skillReachability: skillReach,
+      };
+    }
+
+    const allBlockers = collectTreeBlockers(rootNode);
+    const ahReach = ahOnlySkillNames.map(s => buildAHSkillReachability(s, comp, playerState));
+
+    results.push({
+      rank: rank++,
+      root: rootNode,
+      reachabilityTier: classifyTier(allBlockers),
+      totalCost: rootNode.totalCost,
+      totalFusions: countFusions(rootNode),
+      ownedLeafCount: countOwnedLeaves(rootNode),
+      ahOnlySkills: ahReach,
+      blockers: allBlockers,
+    });
   }
 
   return results;
 }
 
-// ---------------------------------------------------------------------------
-// Skill source finder
-// ---------------------------------------------------------------------------
-
-function findSkillSourceNodes(
-  demonName: string,
-  requiredSkills: string[],
+function buildNodeFromDpState(
+  state: DpState, 
+  skillsContributed: string[], 
+  comp: Compendium, 
   playerState: PlayerState,
-  comp: Compendium,
-  chart: FusionChart,
-  recipeConfig: RecipeGeneratorConfig,
-  maxDepth: number,
-  currentDepth: number,
-  visited: Set<string>,
-): FusionNode[] {
-  const demon = comp.getDemon(demonName);
-  if (!demon) { return []; }
+  inheritableSkills: string[]
+): FusionNode {
+  const demon = comp.getDemon(state.demonName);
+  const reachability = evaluateDemonReachability(state.demonName, demon, playerState);
+  const skillReach = skillsContributed.map(s => evaluateSkillReachability(s, state.demonName, demon, playerState));
+  
+  if (!state.left || !state.right) {
+    return {
+      demon: state.demonName,
+      skillsContributed,
+      inheritMask: demon.inherits || 0x3FFF,
+      totalCost: state.cost,
+      depth: 0,
+      isOwned: state.isOwned,
+      reachability,
+      skillReachability: skillReach
+    };
+  }
 
-  // Demon must either already have each required skill OR have a free slot for it.
-  const { freeCmd, freePas } = freeSlots(demon, comp);
-  let neededCmd = 0;
-  let neededPas = 0;
-
-  for (const skillName of requiredSkills) {
-    const alreadyHas = demon.skills[skillName] !== undefined &&
-                       !isAHExclusiveSkill(demon.skills[skillName]);
-    if (alreadyHas) { continue; } // skill is already present — no slot needed
-    if (isPassiveSkill(comp, skillName)) {
-      neededPas++;
-    } else {
-      neededCmd++;
+  // Figure out which skills flowed from left vs right
+  const leftMask = state.left.mask;
+  const rightMask = state.right.mask;
+  
+  const leftSkills = [];
+  const rightSkills = [];
+  for (let i = 0; i < inheritableSkills.length; i++) {
+    if (skillsContributed.includes(inheritableSkills[i])) {
+      if ((leftMask & (1 << i)) !== 0) leftSkills.push(inheritableSkills[i]);
+      else if ((rightMask & (1 << i)) !== 0) rightSkills.push(inheritableSkills[i]);
     }
   }
 
-  if (neededCmd > freeCmd || neededPas > freePas) { return []; }
+  const leftNode = buildNodeFromDpState(state.left, leftSkills, comp, playerState, inheritableSkills);
+  const rightNode = buildNodeFromDpState(state.right, rightSkills, comp, playerState, inheritableSkills);
 
-  const ownedVersion = playerState.ownedDemons.find(d => d.name === demonName);
-  if (ownedVersion && hasRequiredSkillsNow(ownedVersion, requiredSkills, demon)) {
-    return [buildLeafNode(demonName, demon, requiredSkills, 'owned', playerState, comp)];
-  }
-
-  const nodes: FusionNode[] = [
-    buildLeafNode(demonName, demon, requiredSkills, 'fuse_or_buy', playerState, comp),
-  ];
-
-  if (currentDepth < maxDepth) {
-    nodes.push(...collectFusionNodes(
-      demonName, requiredSkills, playerState, comp, chart, recipeConfig,
-      maxDepth, currentDepth, visited,
-    ));
-  }
-
-  return nodes;
-}
-
-// ---------------------------------------------------------------------------
-// Slot-cap-aware skill partition enumeration
-// ---------------------------------------------------------------------------
-
-/**
- * Enumerate all valid ways to split `skills` between leftDemon and rightDemon
- * subject to:
- *   1. Each skill must go to a parent that has a free slot of the right type
- *      (CMD or PAS), OR the parent already has the skill.
- *   2. The total CMD skills routed to a parent must not exceed its freeCmd,
- *      and likewise for PAS.
- *
- * Complexity: O(2^N), N ≤ 6. Fast enough for all practical inputs.
- */
-function enumerateSkillPartitions(
-  skills: string[],
-  leftDemon: Demon,
-  rightDemon: Demon,
-  comp: Compendium,
-): { leftSkills: string[]; rightSkills: string[] }[] {
-  if (skills.length === 0) {
-    return [{ leftSkills: [], rightSkills: [] }];
-  }
-
-  const leftSlots  = freeSlots(leftDemon,  comp);
-  const rightSlots = freeSlots(rightDemon, comp);
-
-  // Pre-classify each skill: is it passive? does each parent already have it?
-  const meta = skills.map(s => ({
-    name: s,
-    isPas: isPassiveSkill(comp, s),
-    leftHas:  leftDemon.skills[s]  !== undefined && !isAHExclusiveSkill(leftDemon.skills[s]  ?? 101),
-    rightHas: rightDemon.skills[s] !== undefined && !isAHExclusiveSkill(rightDemon.skills[s] ?? 101),
-  }));
-
-  const partitions: { leftSkills: string[]; rightSkills: string[] }[] = [];
-  const total = 1 << skills.length;
-
-  for (let mask = 0; mask < total; mask++) {
-    let leftNeedCmd = 0, leftNeedPas = 0;
-    let rightNeedCmd = 0, rightNeedPas = 0;
-    let valid = true;
-
-    const leftSkills:  string[] = [];
-    const rightSkills: string[] = [];
-
-    for (let i = 0; i < skills.length; i++) {
-      const m = meta[i];
-      const goLeft = ((mask >> i) & 1) === 1;
-
-      if (goLeft) {
-        leftSkills.push(m.name);
-        if (!m.leftHas) {
-          m.isPas ? leftNeedPas++ : leftNeedCmd++;
-        }
-      } else {
-        rightSkills.push(m.name);
-        if (!m.rightHas) {
-          m.isPas ? rightNeedPas++ : rightNeedCmd++;
-        }
-      }
-    }
-
-    if (
-      leftNeedCmd  > leftSlots.freeCmd  ||
-      leftNeedPas  > leftSlots.freePas  ||
-      rightNeedCmd > rightSlots.freeCmd ||
-      rightNeedPas > rightSlots.freePas
-    ) { valid = false; }
-
-    if (!valid) { continue; }
-    partitions.push({ leftSkills, rightSkills });
-  }
-
-  // Deduplicate set-equivalent partitions.
-  const seen = new Set<string>();
-  return partitions.filter(p => {
-    const key = [...p.leftSkills].sort().join(',') + '|' + [...p.rightSkills].sort().join(',');
-    if (seen.has(key)) { return false; }
-    seen.add(key);
-    return true;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Node builders
-// ---------------------------------------------------------------------------
-
-function buildInteriorNode(
-  demonName: string,
-  demon: Demon,
-  skillsContributed: string[],
-  left: FusionNode,
-  right: FusionNode,
-  comp: Compendium,
-  playerState: PlayerState,
-): FusionNode {
-  const reachability = evaluateDemonReachability(demonName, demon, playerState);
-  const skillReach   = skillsContributed.map(s =>
-    evaluateSkillReachability(s, demonName, demon, playerState),
-  );
   return {
-    demon: demonName,
+    demon: state.demonName,
     skillsContributed,
-    left,
-    right,
-    inheritMask: left.inheritMask | right.inheritMask,
-    totalCost: demon.price + left.totalCost + right.totalCost,
-    depth: 1 + Math.max(left.depth, right.depth),
+    left: leftNode,
+    right: rightNode,
+    inheritMask: leftNode.inheritMask | rightNode.inheritMask,
+    totalCost: state.cost,
+    depth: state.depth,
     reachability,
-    skillReachability: skillReach,
+    skillReachability: skillReach
   };
 }
 
-function buildLeafNode(
-  demonName: string,
-  demon: Demon,
-  skillsContributed: string[],
-  context: 'owned' | 'fuse_or_buy',
-  playerState: PlayerState,
-  comp: Compendium,
-): FusionNode {
-  const reachability = evaluateDemonReachability(demonName, demon, playerState);
-  const skillReach   = skillsContributed.map(s =>
-    evaluateSkillReachability(s, demonName, demon, playerState),
-  );
-  return {
-    demon: demonName,
-    skillsContributed,
-    left:  undefined,
-    right: undefined,
-    inheritMask: demon.inherits,
-    totalCost: context === 'owned' ? 0 : demon.price,
-    depth: 0,
-    reachability,
-    skillReachability: skillReach,
-  };
-}
-
-function buildSpecialFusionNodes(
-  demonName: string,
-  demon: Demon,
-  specIngreds: string[],
-  requiredSkills: string[],
-  playerState: PlayerState,
-  comp: Compendium,
-): FusionNode[] {
-  const leaves = specIngreds
-    .map(name => {
-      const d = comp.getDemon(name);
-      return d ? buildLeafNode(name, d, [], 'fuse_or_buy', playerState, comp) : null;
-    })
-    .filter(Boolean) as FusionNode[];
-
-  if (leaves.length < 2) { return []; }
-
-  const reachability = evaluateDemonReachability(demonName, demon, playerState);
-  const skillReach   = requiredSkills.map(s =>
-    evaluateSkillReachability(s, demonName, demon, playerState),
-  );
-
-  return [{
-    demon: demonName,
-    skillsContributed: requiredSkills,
-    left:  leaves[0],
-    right: leaves[1],
-    inheritMask: leaves.reduce((acc, n) => acc | n.inheritMask, 0),
-    totalCost: demon.price + leaves.reduce((acc, n) => acc + n.totalCost, 0),
-    depth: 1,
-    reachability,
-    skillReachability: skillReach,
-  }];
-}
-
 // ---------------------------------------------------------------------------
-// Reachability evaluators
+// Reachability evaluators (unchanged logic)
 // ---------------------------------------------------------------------------
 
-function evaluateDemonReachability(
-  demonName: string,
-  demon: Demon,
-  playerState: PlayerState,
-): DemonReachability {
+function evaluateDemonReachability(demonName: string, demon: Demon, playerState: PlayerState): DemonReachability {
   const blockers: ReachabilityBlocker[] = [];
-
+  if (demon.lvl > playerState.maxLevel) {
+    blockers.push({ type: 'level_too_low', detail: `${demonName} (Lv ${demon.lvl}) exceeds your level (${playerState.maxLevel})`, unlockCondition: `Reach Level ${demon.lvl}` });
+  }
   if (demon.fusion === 'story' || demon.prereq) {
     const condition = demon.prereq || `Unlock ${demonName}`;
     if (!playerState.unlockedFusions.includes(demonName)) {
-      blockers.push({
-        type: 'story_locked',
-        detail: `${demonName} requires a story unlock: "${condition}"`,
-        unlockCondition: condition,
-      });
+      blockers.push({ type: 'story_locked', detail: `${demonName} requires a story unlock: "${condition}"`, unlockCondition: condition });
     }
   }
-
   if (demon.fusion === 'auction') {
     const tier = detectDemonAHTier(demon);
     if (tier) {
@@ -481,35 +440,23 @@ function evaluateDemonReachability(
       if (b) { blockers.push(b); }
     }
   }
-
   const method: AcquisitionMethod =
-    demon.fusion === 'auction'  ? { type: 'auction',      tier: detectDemonAHTier(demon) ?? 'basic', buyoutCost: demon.price }
+    demon.fusion === 'auction'  ? { type: 'auction', tier: detectDemonAHTier(demon) ?? 'basic', buyoutCost: demon.price }
     : demon.fusion === 'story' ? { type: 'story_unlock', condition: demon.prereq ?? '' }
     : { type: 'fusion' };
 
   return { demonName, method, isReachableNow: blockers.length === 0, blockers };
 }
 
-function evaluateSkillReachability(
-  skillName: string,
-  demonName: string,
-  demon: Demon,
-  playerState: PlayerState,
-): SkillReachability {
+function evaluateSkillReachability(skillName: string, demonName: string, demon: Demon, playerState: PlayerState): SkillReachability {
   const skillLevel = demon.skills[skillName];
   const blockers: ReachabilityBlocker[] = [];
   let method: AcquisitionMethod;
   let canBeInherited = true;
 
   if (skillLevel === undefined) {
-    return {
-      skillName, onDemon: demonName,
-      method: { type: 'innate' },
-      canBeInherited: false, isReachableNow: false,
-      blockers: [{ type: 'story_locked', detail: `${skillName} not found on ${demonName}`, unlockCondition: '' }],
-    };
+    return { skillName, onDemon: demonName, method: { type: 'innate' }, canBeInherited: false, isReachableNow: false, blockers: [{ type: 'story_locked', detail: `${skillName} not found on ${demonName}`, unlockCondition: '' }] };
   }
-
   if (isAHExclusiveSkill(skillLevel)) {
     canBeInherited = false;
     const tier = decodeAHSkillTier(skillLevel) ?? 'occult';
@@ -523,69 +470,20 @@ function evaluateSkillReachability(
     method = { type: 'levelup', requiredLevel };
     const owned = playerState.ownedDemons.find(d => d.name === demonName);
     if (owned && owned.currentLevel < requiredLevel) {
-      blockers.push({
-        type: 'level_too_low',
-        detail: `${demonName} must reach Lv ${requiredLevel} to learn ${skillName} (currently Lv ${owned.currentLevel})`,
-        unlockCondition: `Level ${demonName} to ${requiredLevel}`,
-      });
+      blockers.push({ type: 'level_too_low', detail: `${demonName} must reach Lv ${requiredLevel} to learn ${skillName}`, unlockCondition: `Level ${demonName} to ${requiredLevel}` });
     }
   }
-
   return { skillName, onDemon: demonName, method, canBeInherited, isReachableNow: blockers.length === 0, blockers };
-}
-
-// ---------------------------------------------------------------------------
-// Ranking
-// ---------------------------------------------------------------------------
-
-function rankAndWrap(
-  roots: FusionNode[],
-  ahOnlySkills: SkillReachability[],
-  strategy: RankStrategy,
-  maxResults: number,
-): RankedFusionResult[] {
-  const sorted = [...roots].sort((a, b) => {
-    switch (strategy) {
-      case 'cheapest':        return a.totalCost - b.totalCost;
-      case 'fewest_steps':    return a.depth - b.depth;
-      case 'most_owned_used': return countOwnedLeaves(b) - countOwnedLeaves(a);
-      default:                return a.totalCost - b.totalCost;
-    }
-  });
-
-  return sorted.slice(0, maxResults).map((root, i) => {
-    const allBlockers = collectTreeBlockers(root);
-    return {
-      rank: i + 1,
-      root,
-      reachabilityTier: classifyTier(allBlockers),
-      totalCost: root.totalCost,
-      totalFusions: countFusions(root),
-      ownedLeafCount: countOwnedLeaves(root),
-      ahOnlySkills,
-      blockers: allBlockers,
-    };
-  });
 }
 
 function classifyTier(blockers: ReachabilityBlocker[]): ReachabilityTier {
   if (blockers.length === 0) { return 'available_now'; }
-  const hardGate = blockers.some(
-    b => b.type === 'story_locked' ||
-         (b.type === 'ah_tier_locked' && b.detail.toLowerCase().includes('occult')),
-  );
+  const hardGate = blockers.some(b => b.type === 'story_locked' || (b.type === 'ah_tier_locked' && b.detail.toLowerCase().includes('occult')));
   return (hardGate || blockers.length > 1) ? 'later_game' : 'soon';
 }
 
-// ---------------------------------------------------------------------------
-// Tree utilities
-// ---------------------------------------------------------------------------
-
 function collectTreeBlockers(node: FusionNode): ReachabilityBlocker[] {
-  const all = [
-    ...node.reachability.blockers,
-    ...node.skillReachability.flatMap(s => s.blockers),
-  ];
+  const all = [...node.reachability.blockers, ...node.skillReachability.flatMap(s => s.blockers)];
   if (node.left)  { all.push(...collectTreeBlockers(node.left)); }
   if (node.right) { all.push(...collectTreeBlockers(node.right)); }
   return all.filter((b, i, a) => a.findIndex(x => x.detail === b.detail) === i);
@@ -593,48 +491,27 @@ function collectTreeBlockers(node: FusionNode): ReachabilityBlocker[] {
 
 function countFusions(node: FusionNode): number {
   if (!node.left && !node.right) { return 0; }
-  return 1 +
-    (node.left  ? countFusions(node.left)  : 0) +
-    (node.right ? countFusions(node.right) : 0);
+  return 1 + (node.left ? countFusions(node.left) : 0) + (node.right ? countFusions(node.right) : 0);
 }
 
 function countOwnedLeaves(node: FusionNode): number {
-  if (!node.left && !node.right) {
-    return node.reachability.method.type === 'innate' ? 1 : 0;
-  }
-  return (node.left  ? countOwnedLeaves(node.left)  : 0) +
-         (node.right ? countOwnedLeaves(node.right) : 0);
+  if (!node.left && !node.right) { return node.isOwned ? 1 : 0; }
+  return (node.left ? countOwnedLeaves(node.left) : 0) + (node.right ? countOwnedLeaves(node.right) : 0);
 }
-
-// ---------------------------------------------------------------------------
-// AH helpers
-// ---------------------------------------------------------------------------
 
 function isSkillAHOnly(skillName: string, comp: Compendium): boolean {
   const skill = comp.getSkill(skillName);
   if (!skill) { return false; }
-  return skill.learnedBy.length > 0 &&
-         skill.learnedBy.every(e => isAHExclusiveSkill(e.level));
+  return skill.learnedBy.length > 0 && skill.learnedBy.every(e => isAHExclusiveSkill(e.level));
 }
 
-function buildAHSkillReachability(
-  skillName: string,
-  comp: Compendium,
-  playerState: PlayerState,
-): SkillReachability {
+function buildAHSkillReachability(skillName: string, comp: Compendium, playerState: PlayerState): SkillReachability {
   const skill = comp.getSkill(skillName);
   const first = skill?.learnedBy[0];
   const tier  = first ? (decodeAHSkillTier(first.level) ?? 'occult') : 'occult';
   const demon = first ? comp.getDemon(first.demon) : null;
   const b = checkAHTierBlocker(tier, playerState);
-  return {
-    skillName,
-    onDemon: first?.demon ?? 'unknown',
-    method: { type: 'auction', tier, buyoutCost: demon?.price ?? 0 },
-    canBeInherited: false,
-    isReachableNow: !b,
-    blockers: b ? [b] : [],
-  };
+  return { skillName, onDemon: first?.demon ?? 'unknown', method: { type: 'auction', tier, buyoutCost: demon?.price ?? 0 }, canBeInherited: false, isReachableNow: !b, blockers: b ? [b] : [] };
 }
 
 function detectDemonAHTier(demon: Demon): AHTier | null {
@@ -642,48 +519,15 @@ function detectDemonAHTier(demon: Demon): AHTier | null {
   let highest: AHTier | null = null;
   for (const level of Object.values(demon.skills)) {
     const t = decodeAHSkillTier(level);
-    if (t && (highest === null || order.indexOf(t) > order.indexOf(highest))) {
-      highest = t;
-    }
+    if (t && (highest === null || order.indexOf(t) > order.indexOf(highest))) { highest = t; }
   }
   return highest;
 }
 
-function checkAHTierBlocker(
-  tier: AHTier,
-  playerState: PlayerState,
-): ReachabilityBlocker | null {
+function checkAHTierBlocker(tier: AHTier, playerState: PlayerState): ReachabilityBlocker | null {
   if (playerState.ahTiersUnlocked.includes(tier)) { return null; }
   const req = AH_TIER_REQUIREMENTS[tier];
   const parts: string[] = [];
-  if (playerState.currentDay    < req.minDay)    { parts.push(`Day ${req.minDay} (currently Day ${playerState.currentDay})`); }
-  if (playerState.currentRating < req.minRating) { parts.push(`Rating ${req.minRating} (currently ${playerState.currentRating})`); }
-  const label = tier.charAt(0).toUpperCase() + tier.slice(1);
-  return {
-    type: 'ah_tier_locked',
-    detail: `${label} AH requires ${parts.join(' + ')} + ${req.unlockCost} Macca to unlock`,
-    unlockCondition: `Reach ${parts.join(' and ')} then pay ${req.unlockCost} Macca at the Auction House`,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Owned demon helper
-// ---------------------------------------------------------------------------
-
-function hasRequiredSkillsNow(
-  owned: OwnedDemon,
-  requiredSkills: string[],
-  demon: Demon,
-): boolean {
-  for (const skillName of requiredSkills) {
-    const level = demon.skills[skillName];
-    if (level === undefined) { return false; }
-    if (level <= 0.9) { continue; }                          // innate — always available
-    if (isAHExclusiveSkill(level)) {
-      if (!owned.skills.includes(skillName)) { return false; }
-      continue;
-    }
-    if (owned.currentLevel < Math.round(level)) { return false; } // level-up skill
-  }
-  return true;
+  if (playerState.currentDay < req.minDay) { parts.push(`Day ${req.minDay}`); }
+  return { type: 'ah_tier_locked', detail: `AH Tier requires ${parts.join(' + ')}`, unlockCondition: `Reach ${parts.join(' and ')}` };
 }
