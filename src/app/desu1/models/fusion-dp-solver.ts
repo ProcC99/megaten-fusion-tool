@@ -23,6 +23,8 @@ export interface DPState {
   ahCount: number;
   maccaCost: number;
   summonCount: number;
+  ownedCount: number;
+  ownedMask: number;
   isOwned?: boolean;
   recipe: FusionRecipe | null;
 }
@@ -55,6 +57,7 @@ export interface DPFusionResult {
     fuse2: string;
     result: string;
   }[];
+  label?: string;
 }
 
 export class FusionDPSolver {
@@ -145,7 +148,7 @@ export class FusionDPSolver {
     targetDemon: string, 
     requiredSkills: string[], 
     maxPlayerLevel: number = 99,
-    criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'min_summons' = 'min_level',
+    criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned' = 'min_level',
     ownedDemons: OwnedDemon[] = []
   ): DPFusionResult | null {
     const bestMap = new Map<string, DPState>();
@@ -156,10 +159,19 @@ export class FusionDPSolver {
       const key = this.getKey(state.demon, state.skills);
       const existing = bestMap.get(key);
       if (existing) {
-        if (criteria === 'min_level' && existing.maxLevel <= state.maxLevel) return;
-        if (criteria === 'min_fusions' && existing.cost <= state.cost) return;
-        if (criteria === 'min_ah' && existing.ahCount <= state.ahCount) return;
-        if (criteria === 'min_summons' && existing.summonCount <= state.summonCount) return;
+        if (criteria === 'min_level') {
+          if (existing.maxLevel < state.maxLevel) return;
+          if (existing.maxLevel === state.maxLevel && existing.maccaCost <= state.maccaCost) return;
+        } else if (criteria === 'min_fusions') {
+          if (existing.cost < state.cost) return;
+          if (existing.cost === state.cost && existing.maccaCost <= state.maccaCost) return;
+        } else if (criteria === 'min_ah') {
+          if (existing.ahCount < state.ahCount) return;
+          if (existing.ahCount === state.ahCount && existing.maccaCost <= state.maccaCost) return;
+        } else if (criteria === 'max_owned') {
+          if (existing.ownedCount > state.ownedCount) return;
+          if (existing.ownedCount === state.ownedCount && existing.maccaCost <= state.maccaCost) return;
+        }
       }
       bestMap.set(key, state);
       pq.push(state);
@@ -173,7 +185,7 @@ export class FusionDPSolver {
     // Empty state for all demons
     for (const demon of this.comp.allDemons) {
       const dName = demon.name;
-      pushState({ demon: dName, skills: [], maxLevel: this.getDemonLevel(dName), cost: 0, ahCount: 0, maccaCost: this.getDemonPrice(dName), summonCount: 1, recipe: null });
+      pushState({ demon: dName, skills: [], maxLevel: this.getDemonLevel(dName), cost: 0, ahCount: 0, maccaCost: this.getDemonPrice(dName), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
     }
 
     // Natural holders for each required skill
@@ -181,44 +193,45 @@ export class FusionDPSolver {
       const holders = this.getNaturalHolders(sk);
       for (const h of holders) {
         const ahc = isAH(this.comp.getSkill(sk).level) ? 1 : 0;
-        pushState({ demon: h.name, skills: [sk], maxLevel: h.reqLevel, cost: 0, ahCount: ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, recipe: null });
+        pushState({ demon: h.name, skills: [sk], maxLevel: h.reqLevel, cost: 0, ahCount: ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
         
         // Also add combined state if a demon naturally holds multiple required skills
         const multiSkills = skillList.filter(s => h.name === this.getNaturalHolders(s).find(x => x.name === h.name)?.name);
         if (multiSkills.length > 1) {
           const m_ahc = multiSkills.filter(s => isAH(this.comp.getSkill(s).level)).length;
-          pushState({ demon: h.name, skills: multiSkills, maxLevel: h.reqLevel, cost: 0, ahCount: m_ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, recipe: null });
+          pushState({ demon: h.name, skills: multiSkills, maxLevel: h.reqLevel, cost: 0, ahCount: m_ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
         }
       }
     }
 
-    // Custom Owned Demons (cost 0, ahCount 0, maccaCost 0, summonCount 0)
-    for (const owned of ownedDemons) {
+    // Custom Owned Demons
+    for (let i = 0; i < ownedDemons.length; i++) {
+      const owned = ownedDemons[i];
       const relevantSkills = owned.skills.filter(s => skillList.includes(s));
-      if (relevantSkills.length > 0) {
-        pushState({
-          demon: owned.name,
-          skills: relevantSkills,
-          maxLevel: this.getDemonLevel(owned.name),
-          cost: 0,
-          ahCount: 0,
-          maccaCost: 0,
-          summonCount: 0,
-          isOwned: true,
-          recipe: null
-        });
-      }
+      pushState({
+        demon: owned.name,
+        skills: relevantSkills,
+        maxLevel: this.getDemonLevel(owned.name),
+        cost: 0,
+        ahCount: 0,
+        maccaCost: 0,
+        summonCount: 0,
+        ownedCount: 1,
+        ownedMask: 1 << i,
+        isOwned: true,
+        recipe: null
+      });
     }
 
     const sortPQ = () => {
       if (criteria === 'min_level') {
-        pq.sort((a, b) => (a.maxLevel - b.maxLevel) || (a.cost - b.cost));
+        pq.sort((a, b) => (a.maxLevel - b.maxLevel) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost));
       } else if (criteria === 'min_fusions') {
-        pq.sort((a, b) => (a.cost - b.cost) || (a.maxLevel - b.maxLevel));
+        pq.sort((a, b) => (a.cost - b.cost) || (a.maccaCost - b.maccaCost) || (a.maxLevel - b.maxLevel));
       } else if (criteria === 'min_ah') {
-        pq.sort((a, b) => (a.ahCount - b.ahCount) || (a.cost - b.cost) || (a.maxLevel - b.maxLevel));
-      } else if (criteria === 'min_summons') {
-        pq.sort((a, b) => (a.summonCount - b.summonCount) || (a.maxLevel - b.maxLevel));
+        pq.sort((a, b) => (a.ahCount - b.ahCount) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost));
+      } else if (criteria === 'max_owned') {
+        pq.sort((a, b) => (b.ownedCount - a.ownedCount) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost));
       }
     };
 
@@ -238,7 +251,7 @@ export class FusionDPSolver {
       if (criteria === 'min_level' && bestCurrent.maxLevel < current.maxLevel) continue;
       if (criteria === 'min_fusions' && bestCurrent.cost < current.cost) continue;
       if (criteria === 'min_ah' && bestCurrent.ahCount < current.ahCount) continue;
-      if (criteria === 'min_summons' && bestCurrent.summonCount < current.summonCount) continue;
+      if (criteria === 'max_owned' && bestCurrent.ownedCount > current.ownedCount) continue;
       
       if (current.demon === targetDemon && this.isSubset(requiredSkills, current.skills)) {
         return this.buildResult(currentKey, bestMap);
@@ -263,6 +276,7 @@ export class FusionDPSolver {
           const bState = bestMap.get(bKey);
           
           if (bState) {
+            if (current.ownedMask !== 0 && bState.ownedMask !== 0 && (current.ownedMask & bState.ownedMask) !== 0) continue;
             const mergedSkills = Array.from(new Set([...current.skills, ...bState.skills])).sort();
             if (mergedSkills.length === 0) continue; 
             
@@ -296,6 +310,8 @@ export class FusionDPSolver {
               ahCount: newAhCount,
               maccaCost: newMaccaCost,
               summonCount: newSummonCount,
+              ownedCount: current.ownedCount + bState.ownedCount,
+              ownedMask: current.ownedMask | bState.ownedMask,
               recipe: {
                 name1: current.demon, skills1: current.skills,
                 name2: bState.demon,  skills2: bState.skills

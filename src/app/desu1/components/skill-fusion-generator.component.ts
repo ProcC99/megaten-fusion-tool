@@ -6,15 +6,20 @@
 
 import { Component, OnInit, OnDestroy, Inject, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { Subscription, combineLatest } from 'rxjs';
-
+import { combineLatest, Subscription } from 'rxjs';
 import { FUSION_DATA_SERVICE } from '../../compendium/constants';
 import { FusionDataService } from '../../smt4f/fusion-data.service';
 import { Compendium } from '../../smt4f/models/compendium';
 
 import { FusionDPSolver, DPFusionResult, FusionGraphNode, OwnedDemon } from '../models/fusion-dp-solver';
-import { DemonProfileBuilder } from '../models/demon-profile-builder';
+import { DemonProfileBuilder, DemonProfile } from '../models/demon-profile-builder';
 import { decodeAHSkillTier } from '../models/fusion-tree-types';
+
+export interface OwnedDemonUI {
+  profile: DemonProfile;
+  freeCmdSlots: (string | null)[];
+  freePasSlots: (string | null)[];
+}
 
 @Component({
   selector: 'app-skill-fusion-generator',
@@ -122,34 +127,61 @@ import { decodeAHSkillTier } from '../models/fusion-tree-types';
     <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 12px;">Add demons you already own to use them as free base ingredients in the fusion tree.</p>
     
     <div class="owned-demon-list">
-       <div class="owned-demon-item" *ngFor="let od of ownedDemons; let odIdx = index">
-           <span class="owned-demon-name">{{ od.name }}</span>
-           <div class="owned-demon-skills">
-              <span class="owned-skill" *ngFor="let s of od.skills; let skIdx = index">
-                 {{ s }} <button class="btn-remove-skill" (click)="removeOwnedSkill(odIdx, skIdx)">✕</button>
-              </span>
-              <button class="btn-add-owned-skill" (click)="openOwnedSkillPicker(odIdx)">+ Add Skill</button>
-           </div>
-           <button class="btn-remove-demon" (click)="removeOwnedDemon(odIdx)">✕</button>
+       <div class="owned-demon-item-profile" *ngFor="let od of ownedDemonUIs; let odIdx = index">
+         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #2a2a2a; padding: 8px 12px; border-radius: 4px;">
+           <span style="font-size: 1.1rem; font-weight: bold; color: #a1d99b;">{{ od.profile.name }} <span style="font-size: 0.8rem; color: #aaa;">(Lv {{ od.profile.lvl }} {{ od.profile.race }})</span></span>
+           <button class="btn-remove-demon" (click)="removeOwnedDemon(odIdx)">✕ Remove</button>
+         </div>
+
+         <div class="slots-container" style="margin-top: 0;">
+            <!-- Command Skills -->
+            <div class="slot-column">
+              <h4>Command Skills ({{ getFilledSlotCount(od.freeCmdSlots) + od.profile.innateCmd.length }}/3)</h4>
+              <div class="slot innate-slot" *ngFor="let sk of od.profile.innateCmd">
+                <span class="slot-icon">🗡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+              </div>
+              <div class="slot free-slot" *ngFor="let sk of od.freeCmdSlots; let i = index" 
+                   (click)="openSkillPicker('cmd', i, odIdx)"
+                   [class.is-filled]="sk !== null"
+                   [class.is-active]="activePickerType === 'cmd' && activePickerIndex === i && activeOwnedDemonIndex === odIdx">
+                <span class="slot-icon">🗡</span>
+                <span class="slot-text">{{ sk ? sk : '[ Click to set Command Skill ]' }}</span>
+                <button class="btn-clear-slot" *ngIf="sk" (click)="clearSlot('cmd', i, $event, odIdx)">✕</button>
+              </div>
+            </div>
+      
+            <!-- Passive Skills -->
+            <div class="slot-column">
+              <h4>Passive Skills ({{ getFilledSlotCount(od.freePasSlots) + od.profile.innatePas.length }}/3)</h4>
+              <div class="slot innate-slot" *ngFor="let sk of od.profile.innatePas">
+                <span class="slot-icon">🛡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+              </div>
+              <div class="slot free-slot" *ngFor="let sk of od.freePasSlots; let i = index" 
+                   (click)="openSkillPicker('pas', i, odIdx)"
+                   [class.is-filled]="sk !== null"
+                   [class.is-active]="activePickerType === 'pas' && activePickerIndex === i && activeOwnedDemonIndex === odIdx">
+                <span class="slot-icon">🛡</span>
+                <span class="slot-text">{{ sk ? sk : '[ Click to set Passive Skill ]' }}</span>
+                <button class="btn-clear-slot" *ngIf="sk" (click)="clearSlot('pas', i, $event, odIdx)">✕</button>
+              </div>
+            </div>
+      
+            <!-- Racial Skill -->
+            <div class="slot-column racial-column">
+              <h4>Racial Skill</h4>
+              <div class="slot innate-slot">
+                <span class="slot-icon">★</span> {{ od.profile.innateRac || 'None' }}
+              </div>
+            </div>
+         </div>
        </div>
     </div>
   
-    <div class="add-owned-demon-container" style="position: relative;">
+    <div class="add-owned-demon-container" style="position: relative; margin-top: 12px;">
       <input type="text" placeholder="Add owned demon..." [(ngModel)]="ownedDemonSearchQuery" (input)="onOwnedDemonSearch()" class="search-input" />
       <ul class="suggestions-list" *ngIf="ownedDemonSuggestions.length > 0">
         <li *ngFor="let s of ownedDemonSuggestions" (click)="addOwnedDemon(s)" class="suggestion-item">{{ s }}</li>
       </ul>
-    </div>
-    
-    <div class="skill-picker" *ngIf="activeOwnedDemonIndex !== null">
-        <div class="picker-header">
-          <h5>Select Skill for {{ ownedDemons[activeOwnedDemonIndex].name }}</h5>
-          <button class="btn-close-picker" (click)="closeOwnedSkillPicker()">✕</button>
-        </div>
-        <input type="text" placeholder="Search skill..." [(ngModel)]="ownedSkillSearchQuery" (input)="onOwnedSkillSearch()" class="skill-picker-input" autofocus />
-        <ul class="picker-suggestions">
-          <li *ngFor="let s of ownedSkillSuggestions" (click)="selectOwnedSkill(s)" class="picker-item">{{ s }}</li>
-        </ul>
     </div>
 
     <hr style="border: 0; border-top: 1px dashed #333; margin: 20px 0;" />
@@ -172,7 +204,7 @@ import { decodeAHSkillTier } from '../models/fusion-tree-types';
               *ngFor="let res of dpResults; let i = index" 
               [class.active]="selectedResultIndex === i"
               (click)="selectedResultIndex = i">
-        <div class="tab-title">Path {{ i + 1 }}</div>
+        <div class="tab-title">{{ res.label }}</div>
         <div class="tab-stats">Lv {{ res.maxLevel }} | {{ res.totalFusions }} Steps | {{ res.ahCount }} AH</div>
         <div class="tab-stats" style="margin-top: 2px;">{{ res.summonCount }} Summons | {{ res.maccaCost | number }} Macca</div>
       </button>
@@ -289,16 +321,9 @@ import { decodeAHSkillTier } from '../models/fusion-tree-types';
     .node-demon { font-weight: bold; color: #a1d99b; margin-right: 8px; }
     
     /* Owned Demons */
-    .owned-demon-item { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-    .owned-demon-name { font-weight: bold; width: 120px; flex-shrink: 0; }
-    .owned-demon-skills { display: flex; gap: 8px; flex-grow: 1; align-items: center; flex-wrap: wrap; }
-    .owned-skill { background: #333; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
-    .btn-remove-skill { background: none; border: none; color: #999; cursor: pointer; font-size: 0.8rem; padding: 0; margin-top: -1px; }
-    .btn-remove-skill:hover { color: #fff; }
-    .btn-add-owned-skill { background: #222; border: 1px dashed #555; border-radius: 12px; padding: 2px 8px; font-size: 0.85rem; color: #ccc; cursor: pointer; }
-    .btn-add-owned-skill:hover { background: #333; color: #fff; }
-    .btn-remove-demon { background: none; border: none; color: #c34242; cursor: pointer; font-size: 1.1rem; padding: 0; margin-left: 12px; }
-    .btn-remove-demon:hover { color: #f55; }
+    .owned-demon-item-profile { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 12px; margin-bottom: 12px; }
+    .btn-remove-demon { background: none; border: none; color: #c34242; cursor: pointer; font-size: 0.9rem; padding: 4px 8px; border-radius: 4px; background: rgba(195, 66, 66, 0.1); }
+    .btn-remove-demon:hover { background: rgba(195, 66, 66, 0.2); }
     
     .node-skills { color: #f1c40f; font-size: 0.9em; margin-left: 8px; }
     .skill-req { color: #aaa; font-size: 0.85em; font-style: italic; }
@@ -344,12 +369,10 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   fusionChart: any;
 
   // Owned Demons State
-  ownedDemons: OwnedDemon[] = [];
+  ownedDemonUIs: OwnedDemonUI[] = [];
   ownedDemonSearchQuery: string = '';
   ownedDemonSuggestions: string[] = [];
   activeOwnedDemonIndex: number | null = null;
-  ownedSkillSearchQuery: string = '';
-  ownedSkillSuggestions: string[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -425,9 +448,10 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   // -------------------------------------
   // Skill Picker
   // -------------------------------------
-  openSkillPicker(type: 'cmd' | 'pas', index: number) {
+  openSkillPicker(type: 'cmd' | 'pas', index: number, ownedDemonIdx?: number) {
     this.activePickerType = type;
     this.activePickerIndex = index;
+    this.activeOwnedDemonIndex = ownedDemonIdx ?? null;
     this.skillSearchQuery = '';
     this.updateSkillSuggestions();
   }
@@ -435,14 +459,23 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   closeSkillPicker() {
     this.activePickerType = null;
     this.activePickerIndex = -1;
+    this.activeOwnedDemonIndex = null;
   }
 
-  clearSlot(type: 'cmd' | 'pas', index: number, event: Event) {
+  clearSlot(type: 'cmd' | 'pas', index: number, event: Event, ownedDemonIdx?: number) {
     event.stopPropagation();
-    if (type === 'cmd') {
-      this.freeCmdSlots[index] = null;
+    if (ownedDemonIdx !== undefined) {
+      if (type === 'cmd') {
+        this.ownedDemonUIs[ownedDemonIdx].freeCmdSlots[index] = null;
+      } else {
+        this.ownedDemonUIs[ownedDemonIdx].freePasSlots[index] = null;
+      }
     } else {
-      this.freePasSlots[index] = null;
+      if (type === 'cmd') {
+        this.freeCmdSlots[index] = null;
+      } else {
+        this.freePasSlots[index] = null;
+      }
     }
   }
 
@@ -484,10 +517,18 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   }
 
   selectSkill(skillName: string) {
-    if (this.activePickerType === 'cmd') {
-      this.freeCmdSlots[this.activePickerIndex] = skillName;
-    } else if (this.activePickerType === 'pas') {
-      this.freePasSlots[this.activePickerIndex] = skillName;
+    if (this.activeOwnedDemonIndex !== null) {
+      if (this.activePickerType === 'cmd') {
+        this.ownedDemonUIs[this.activeOwnedDemonIndex].freeCmdSlots[this.activePickerIndex] = skillName;
+      } else if (this.activePickerType === 'pas') {
+        this.ownedDemonUIs[this.activeOwnedDemonIndex].freePasSlots[this.activePickerIndex] = skillName;
+      }
+    } else {
+      if (this.activePickerType === 'cmd') {
+        this.freeCmdSlots[this.activePickerIndex] = skillName;
+      } else if (this.activePickerType === 'pas') {
+        this.freePasSlots[this.activePickerIndex] = skillName;
+      }
     }
     this.closeSkillPicker();
   }
@@ -505,46 +546,21 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   }
 
   addOwnedDemon(name: string) {
-    this.ownedDemons.push({ name, skills: [] });
+    const builder = new DemonProfileBuilder(this.compendium);
+    const profile = builder.buildProfile(name);
+    if (profile) {
+      this.ownedDemonUIs.push({
+        profile,
+        freeCmdSlots: Array(profile.freeCmdCount).fill(null),
+        freePasSlots: Array(profile.freePasCount).fill(null)
+      });
+    }
     this.ownedDemonSearchQuery = '';
     this.ownedDemonSuggestions = [];
   }
 
   removeOwnedDemon(index: number) {
-    this.ownedDemons.splice(index, 1);
-  }
-
-  removeOwnedSkill(demonIdx: number, skillIdx: number) {
-    this.ownedDemons[demonIdx].skills.splice(skillIdx, 1);
-  }
-
-  openOwnedSkillPicker(demonIdx: number) {
-    this.activeOwnedDemonIndex = demonIdx;
-    this.ownedSkillSearchQuery = '';
-    this.onOwnedSkillSearch();
-  }
-
-  closeOwnedSkillPicker() {
-    this.activeOwnedDemonIndex = null;
-  }
-
-  onOwnedSkillSearch() {
-    const q = this.ownedSkillSearchQuery.toLowerCase();
-    this.ownedSkillSuggestions = this.compendium.allSkills
-      .filter(s => s.element !== 'aut' && s.element !== 'auto' && s.element !== 'rac') // Can add passive or command
-      .map(s => s.name)
-      .filter(n => n.toLowerCase().includes(q))
-      .sort((a, b) => a.length - b.length || a.localeCompare(b))
-      .slice(0, 20);
-  }
-
-  selectOwnedSkill(skillName: string) {
-    if (this.activeOwnedDemonIndex !== null) {
-      if (!this.ownedDemons[this.activeOwnedDemonIndex].skills.includes(skillName)) {
-        this.ownedDemons[this.activeOwnedDemonIndex].skills.push(skillName);
-      }
-      this.closeOwnedSkillPicker();
-    }
+    this.ownedDemonUIs.splice(index, 1);
   }
 
   // -------------------------------------
@@ -582,25 +598,42 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
         const startTime = performance.now();
         
         const results: DPFusionResult[] = [];
-        const seenHashes = new Set<string>();
+        const seenHashes = new Map<string, DPFusionResult>();
+        
+        // Map UI state to solver state
+        const solverOwnedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
+          const skills = [
+            ...ui.profile.innateCmd,
+            ...ui.profile.innatePas,
+            ...(ui.freeCmdSlots.filter(s => s !== null) as string[]),
+            ...(ui.freePasSlots.filter(s => s !== null) as string[])
+          ];
+          return { name: ui.profile.name, skills };
+        });
 
-        const runSolver = (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'min_summons') => {
+        const runSolver = (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned', labelName: string) => {
           const solver = new FusionDPSolver(this.compendium, this.fusionChart);
-          const res = solver.solveMultiSkillFusion(this.targetDemonObj.name, reqSkills, this.playerMaxLevel, criteria, this.ownedDemons);
+          const res = solver.solveMultiSkillFusion(this.targetDemonObj.name, reqSkills, this.playerMaxLevel, criteria, solverOwnedDemons);
           if (res) {
-            // Deduplicate by graph structure
+            // Deduplicate by graph structure but merge labels
             const hash = res.steps.map(s => s.result).join('|');
             if (!seenHashes.has(hash)) {
-              seenHashes.add(hash);
+              res.label = labelName;
+              seenHashes.set(hash, res);
               results.push(res);
+            } else {
+              const existing = seenHashes.get(hash)!;
+              existing.label += ' & ' + labelName;
             }
           }
         };
 
-        runSolver('min_level');
-        runSolver('min_fusions');
-        runSolver('min_ah');
-        runSolver('min_summons');
+        runSolver('min_level', 'Lowest Level');
+        runSolver('min_fusions', 'Fewest Fusions');
+        runSolver('min_ah', 'Fewest AH');
+        runSolver('max_owned', 'Max Owned');
+        
+        this.dpResults = results;
 
         const endTime = performance.now();
         console.log(`solveMultiSkillFusion (all passes) completed in ${(endTime - startTime).toFixed(2)}ms`);
