@@ -3,506 +3,632 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>DS1/Overclocked – Fusion Path Explorer</title>
+<title>Devil Survivor Overclocked – Fusion Workbench</title>
 <style>
-  :root{--bg:#0d0d0d;--panel:#161616;--border:#2a2a2a;--accent:#c8a035;--accent2:#5b9bd5;--text:#e0e0e0;--muted:#888;--innate:#4caf85;--inherit:#5b9bd5;--empty:#555;--badge-bg:#222;}
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh}
-  h1{color:var(--accent);text-align:center;padding:18px 0 4px;font-size:1.35rem;letter-spacing:.05em}
-  h2{color:var(--accent);font-size:.95rem;margin-bottom:8px}
-  .subtitle{text-align:center;color:var(--muted);margin-bottom:14px;font-size:.82rem}
-  .app{display:flex;gap:0;min-height:calc(100vh - 72px)}
-  .sidebar{width:240px;min-width:200px;background:var(--panel);border-right:1px solid var(--border);padding:12px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
-  .main{flex:1;padding:14px;overflow-y:auto}
-  .search-box{width:100%;background:#1e1e1e;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:13px}
-  .search-box:focus{outline:none;border-color:var(--accent)}
-  select{background:#1e1e1e;border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px;width:100%}
-  select:focus{outline:none;border-color:var(--accent)}
-  .demon-list{display:flex;flex-direction:column;gap:3px;overflow-y:auto;flex:1}
-  .demon-entry{padding:5px 8px;border-radius:4px;cursor:pointer;border:1px solid transparent;display:flex;justify-content:space-between;align-items:center;transition:background .12s}
-  .demon-entry:hover{background:#252525}
-  .demon-entry.selected{background:#1e2a1e;border-color:var(--innate)}
-  .demon-name{font-weight:600;font-size:.85rem}
-  .demon-meta{font-size:.72rem;color:var(--muted)}
-  .demon-panel{background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:12px;overflow:hidden}
-  .demon-header{padding:9px 14px;background:#1a1a1a;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .demon-title{font-size:1rem;font-weight:700;color:var(--accent)}
-  .badge{background:var(--badge-bg);border:1px solid var(--border);border-radius:3px;padding:1px 6px;font-size:.72rem;color:var(--muted)}
-  .demon-body{padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  @media(max-width:700px){.demon-body{grid-template-columns:1fr}}
-  .stats-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
-  .stat-chip{background:#1a1a1a;border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:.76rem;text-align:center;min-width:32px}
-  .stat-chip span{color:var(--muted);font-size:.67rem;display:block}
-  .resist-row{display:flex;gap:3px;margin-top:3px}
-  .res{width:26px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;cursor:default}
-  .res-w{background:#2a1e1e;color:#e05050}
-  .res-r{background:#1a1030;color:#ff3030}
-  .res-d{background:#141a30;color:#5b9bd5}
-  .res-n{background:#222;color:var(--muted)}
-  .res-s{background:#0f2018;color:#4caf85}
-  .res-x{background:#111;color:#444}
-  .skills-section{grid-column:1/-1}
-  .skill-slots{display:flex;flex-direction:column;gap:4px;margin-top:5px}
-  .skill-slot{display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:#111;min-height:28px}
-  .skill-slot.innate{border-color:#4caf8530;background:#0a1810}
-  .skill-slot.inherited{border-color:#5b9bd530;background:#0a1020}
-  .skill-slot.empty{border-color:var(--empty);border-style:dashed;background:#0a0a0a;cursor:pointer}
-  .skill-slot.empty:hover{border-color:var(--accent);background:#1a1400}
-  .skill-tag{font-size:.67rem;padding:1px 5px;border-radius:2px;font-weight:700;flex-shrink:0;white-space:nowrap}
-  .tag-innate{background:#0d2a1e;color:#4caf85;border:1px solid #4caf8540}
-  .tag-learned{background:#1a2a0d;color:#8bc34a;border:1px solid #8bc34a40}
-  .tag-inherited{background:#0d1a2a;color:#5b9bd5;border:1px solid #5b9bd540}
-  .tag-empty{background:#1a1a1a;color:var(--empty);border:1px solid #44444440}
-  .skill-name{font-weight:600;font-size:.82rem;flex:1}
-  .skill-unlock{font-size:.7rem;color:var(--muted);flex-shrink:0}
-  .prob-bar{height:4px;border-radius:2px;background:#222;flex-shrink:0;width:50px;overflow:hidden;margin-left:2px}
-  .prob-fill{height:100%;border-radius:2px;background:var(--accent2)}
-  .add-btn{background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:3px;padding:1px 7px;cursor:pointer;font-size:.75rem}
-  .add-btn:hover{background:var(--accent);color:#000}
-  .remove-btn{background:transparent;border:none;color:#444;cursor:pointer;font-size:.95rem;padding:0 2px;line-height:1;flex-shrink:0}
-  .remove-btn:hover{color:#e05050}
-  .modal-overlay{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:100}
-  .modal-overlay.open{display:flex}
-  .modal{background:#1a1a1a;border:1px solid var(--border);border-radius:8px;width:400px;max-width:95vw;max-height:78vh;display:flex;flex-direction:column;overflow:hidden}
-  .modal-header{padding:10px 14px;background:#202020;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
-  .modal-title{font-weight:700;color:var(--accent);font-size:.9rem}
-  .modal-close{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer}
-  .modal-close:hover{color:var(--text)}
-  .modal-search{padding:8px 12px;border-bottom:1px solid var(--border)}
-  .modal-list{overflow-y:auto;flex:1}
-  .modal-skill-row{padding:6px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #111;font-size:.85rem}
-  .modal-skill-row:hover{background:#222}
-  .modal-skill-name{font-weight:600}
-  .modal-skill-note{font-size:.72rem;color:var(--muted)}
-  .chain-section{margin-top:8px}
-  .chain-steps{display:flex;flex-direction:column;gap:7px}
-  .chain-step{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
-  .chain-step-header{padding:7px 12px;background:#1a1a1a;display:flex;align-items:center;cursor:pointer;user-select:none;justify-content:space-between;gap:8px}
-  .chain-step-header:hover{background:#1e1e1e}
-  .step-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
-  .step-num{color:var(--accent);font-size:.8rem;font-weight:700;flex-shrink:0}
-  .step-demon{font-weight:700;color:var(--text);font-size:.88rem}
-  .step-skills-mini{display:flex;gap:3px;flex-wrap:wrap}
-  .mini-skill{font-size:.68rem;padding:1px 4px;border-radius:2px;background:#1e1e1e;border:1px solid var(--border)}
-  .mini-skill.inn{border-color:#4caf8550;color:#4caf85}
-  .mini-skill.inh{border-color:#5b9bd550;color:#5b9bd5}
-  .step-actions{display:flex;gap:5px;align-items:center;flex-shrink:0}
-  .expand-icon{color:var(--muted);font-size:.8rem;flex-shrink:0}
-  .chain-step-body{padding:10px 12px;border-top:1px solid var(--border);display:none}
-  .chain-step-body.open{display:block}
-  .section-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:8px 0 4px}
-  .add-step-area{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px 14px;border-style:dashed;margin-top:7px}
-  .add-step-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:6px}
-  .empty-state{text-align:center;padding:36px;color:var(--muted);font-size:.88rem}
-  .info-row{font-size:.74rem;color:var(--muted);margin-top:2px}
-  .btn{padding:5px 12px;border-radius:4px;border:none;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .12s}
-  .btn-primary{background:var(--accent);color:#000}
-  .btn-primary:hover{background:#d9b045}
-  .btn-secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
-  .btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
-  .btn-sm{padding:2px 8px;font-size:.73rem}
-  .btn-danger{background:transparent;border:1px solid #e0505040;color:#e05050}
-  .btn-danger:hover{background:#e0505015}
-  .fusion-calc{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:12px}
-  .fusion-calc h3{color:var(--accent2);font-size:.88rem;margin-bottom:8px}
-  .fusion-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .fusion-arrow{color:var(--accent);font-weight:700}
-  .fusion-result{font-weight:700;color:var(--innate);font-size:.9rem;padding:3px 8px;background:#0d1a14;border:1px solid #4caf8540;border-radius:4px}
-  .fusion-result.none{color:var(--muted);background:transparent;border-color:transparent;font-style:italic}
-  .chain-summary{background:#0d1a0d;border:1px solid #4caf8530;border-radius:6px;padding:12px 14px;margin-top:12px}
-  .chain-summary h3{color:var(--innate);font-size:.88rem;margin-bottom:8px}
-  .summary-skills{display:flex;flex-direction:column;gap:4px}
-  .summary-skill{display:flex;align-items:center;gap:8px;font-size:.82rem;padding:3px 6px;border-radius:3px}
-  .summary-skill.confirmed{background:#0a1810;border-left:2px solid var(--innate)}
-  .summary-skill.probable{background:#0a0f18;border-left:2px solid var(--accent2)}
-  .toast{position:fixed;bottom:20px;right:20px;background:#222;border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-size:.82rem;color:var(--text);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:200}
-  .toast.show{opacity:1;transform:translateY(0)}
-  .toast.success{border-color:var(--innate);color:var(--innate)}
+:root{
+  --bg:#0c0c0c;--panel:#151515;--panel2:#1b1b1b;--border:#2b2b2b;--text:#e5e5e5;--muted:#8b8b8b;
+  --accent:#c8a035;--accent2:#4c8fd8;--good:#4caf85;--bad:#e05a5a;--warn:#d6a33a;
+  --cmd:#7cc7ff;--pas:#9fd38d;--owned:#f4c84e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,system-ui,sans-serif;font-size:14px;min-height:100vh}
+h1{color:var(--accent);text-align:center;padding:16px 0 4px;font-size:1.35rem;letter-spacing:.04em}
+.subtitle{text-align:center;color:var(--muted);margin-bottom:14px;font-size:.84rem}
+.app{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 74px)}
+@media(max-width:1100px){.app{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}}
+.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.main{padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.panel-head{padding:10px 12px;background:var(--panel2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.panel-title{font-size:.9rem;font-weight:800;color:var(--accent)}
+.panel-body{padding:12px}
+.small{font-size:.75rem;color:var(--muted)}
+.search{width:100%;background:#202020;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px}
+.search:focus,select:focus{outline:none;border-color:var(--accent)}
+select{background:#202020;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px}
+button{cursor:pointer;font:inherit}
+.btn{padding:7px 12px;border-radius:5px;border:none;font-weight:700}
+.btn-primary{background:var(--accent);color:#111}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:transparent;border:1px solid #e05a5a44;color:var(--bad)}
+.btn-danger:hover{background:#e05a5a14}
+.btn-sm{padding:4px 8px;font-size:.77rem}
+.tabs{display:flex;gap:6px}
+.tab{flex:1;padding:7px 10px;border-radius:5px;border:1px solid var(--border);background:#1d1d1d;color:var(--muted);font-weight:700}
+.tab.active{color:var(--text);border-color:var(--accent);background:#241f11}
+.sidebar-section{display:none;min-height:0;flex:1}
+.sidebar-section.active{display:flex;flex-direction:column;gap:8px}
+.list{display:flex;flex-direction:column;gap:5px;overflow:auto;min-height:0}
+.demon-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;background:#121212;cursor:pointer}
+.demon-row:hover{background:#181818}
+.demon-row.selected{border-color:var(--accent2);background:#10161d}
+.star{width:20px;text-align:center;color:#555;font-size:1rem;cursor:pointer;flex-shrink:0}
+.star.owned{color:var(--owned)}
+.demon-meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.demon-name{font-weight:700;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.demon-sub{font-size:.72rem;color:var(--muted)}
+.badge{padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-size:.7rem;color:var(--muted);background:#1d1d1d}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.workbench-row{display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:end}
+@media(max-width:900px){.workbench-row{grid-template-columns:1fr}.workbench-arrow,.workbench-eq{display:none}}
+.field{display:flex;flex-direction:column;gap:5px}
+.label{font-size:.75rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.result-box{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px;border:1px dashed var(--border);border-radius:6px;background:#101010;min-height:44px}
+.result-name{font-weight:800;color:var(--good)}
+.inline-actions{display:flex;gap:8px;flex-wrap:wrap}
+.compact-card{border:1px solid var(--border);border-radius:7px;background:#111;overflow:hidden}
+.compact-head{padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#171717;cursor:pointer}
+.compact-head:hover{background:#1c1c1c}
+.compact-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.compact-title{font-weight:800;color:var(--accent);font-size:.9rem}
+.compact-body{display:none;padding:10px;border-top:1px solid var(--border)}
+.compact-body.open{display:block}
+.stats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.stat{min-width:38px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:#171717;text-align:center;font-size:.73rem}
+.stat span{display:block;color:var(--muted);font-size:.65rem}
+.resists{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+@media(max-width:700px){.resists{grid-template-columns:repeat(2,1fr)}}
+.res-chip{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:5px;border:1px solid var(--border);background:#171717;font-size:.75rem}
+.res-chip.bad{border-color:#5a2020;color:#ff8d8d;background:#221414}
+.res-chip.good{border-color:#1f4f3e;color:#88deb7;background:#102019}
+.res-chip.neutral{color:var(--muted)}
+.res-chip.special{border-color:#233a57;color:#8ec0ff;background:#101a24}
+.skill-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:800px){.skill-columns{grid-template-columns:1fr}}
+.skill-box{border:1px solid var(--border);border-radius:6px;background:#141414;overflow:hidden}
+.skill-head{padding:7px 9px;font-size:.74rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.skill-head.cmd{background:#0e2030;color:var(--cmd);border-bottom:1px solid #24445f}
+.skill-head.pas{background:#132314;color:var(--pas);border-bottom:1px solid #335436}
+.skill-list{padding:8px;display:flex;flex-direction:column;gap:5px}
+.skill-slot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 7px;border-radius:5px;border:1px solid var(--border);background:#101010;font-size:.8rem}
+.skill-slot.empty{color:#666;border-style:dashed}
+.skill-slot.owned-edit{cursor:pointer}
+.skill-left{display:flex;align-items:center;gap:6px;min-width:0}
+.skill-type-pill{font-size:.62rem;padding:1px 5px;border-radius:999px;border:1px solid currentColor;opacity:.9}
+.skill-type-pill.cmd{color:var(--cmd)}
+.skill-type-pill.pas{color:var(--pas)}
+.skill-note{font-size:.7rem;color:var(--muted);flex-shrink:0}
+.chain{display:flex;flex-direction:column;gap:8px}
+.chain-item{border:1px solid var(--border);border-radius:7px;background:#111;overflow:hidden}
+.chain-summary{padding:8px 10px;background:#171717;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.chain-summary:hover{background:#1c1c1c}
+.chain-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.chain-body{display:none;padding:10px;border-top:1px solid var(--border)}
+.chain-body.open{display:block}
+.arrow{color:var(--accent);font-weight:900}
+.modal-overlay{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.open{display:flex}
+.modal{width:520px;max-width:96vw;max-height:84vh;background:#161616;border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+.modal-head{padding:10px 12px;background:#1e1e1e;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-body{padding:10px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+.skill-pick{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;background:#111;cursor:pointer}
+.skill-pick:hover{background:#171717}
+.help{padding:8px 10px;border:1px dashed var(--border);border-radius:6px;background:#111;color:var(--muted);font-size:.78rem}
+.toast{position:fixed;right:18px;bottom:18px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:#202020;color:var(--text);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:120}
+.toast.show{opacity:1;transform:translateY(0)}
+.empty{padding:18px;text-align:center;color:var(--muted)}
 </style>
 </head>
 <body>
-<h1>⚔ Fusion Path Explorer — DS1 / Overclocked</h1>
-<p class="subtitle">Plan multi-step skill inheritance chains · Simulate fusion results · Export your plan</p>
+<h1>⚔ Devil Survivor Overclocked – Fusion Workbench</h1>
+<p class="subtitle">Pick the demons you own, calculate outcomes, then add only the results you want into a fusion chain.</p>
 
 <div class="app">
-  <div class="sidebar">
-    <h2 style="margin-bottom:2px;font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Demons</h2>
-    <input id="searchInput" class="search-box" placeholder="Search name…" oninput="filterDemons()"/>
-    <select id="raceFilter" onchange="filterDemons()"><option value="">All Races</option></select>
-    <div id="demonList" class="demon-list"></div>
-  </div>
-  <div class="main">
-    <div id="selectedDemonPanel"><div class="empty-state">← Select a demon from the sidebar to start planning a fusion chain</div></div>
-    <div id="fusionCalc" class="fusion-calc" style="display:none">
-      <h3>⚗ Quick Fusion Calculator</h3>
-      <div class="fusion-row">
-        <select id="fusionA" onchange="calcFusion()" style="width:180px"><option value="">Parent A…</option></select>
-        <span class="fusion-arrow">×</span>
-        <select id="fusionB" onchange="calcFusion()" style="width:180px"><option value="">Parent B…</option></select>
-        <span class="fusion-arrow">=</span>
-        <span id="fusionResult" class="fusion-result none">—</span>
-        <button class="btn btn-secondary btn-sm" onclick="useFusionResult()" id="useFusionBtn" style="display:none">Use as Next Step</button>
-      </div>
-      <div id="fusionNote" style="font-size:.72rem;color:var(--muted);margin-top:6px"></div>
+  <aside class="sidebar">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('compendium', this)">My Compendium</button>
+      <button class="tab" onclick="switchTab('all', this)">All Demons</button>
     </div>
-    <div id="chainSection" style="display:none" class="chain-section">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-        <h2 style="color:var(--accent2);margin:0">Fusion Chain</h2>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-secondary btn-sm" onclick="exportChain()">⬇ Export JSON</button>
-          <button class="btn btn-secondary btn-sm" onclick="copyChain()">⧉ Copy Summary</button>
-          <button class="btn btn-danger btn-sm" onclick="clearChain()">✕ Clear</button>
+
+    <div id="tab-compendium" class="sidebar-section active">
+      <input id="ownedSearch" class="search" placeholder="Search owned demons…" oninput="renderSidebar()"/>
+      <div class="help">Click ★ to mark demons you own. Click the demon row to review it or edit its current skills.</div>
+      <div id="ownedList" class="list"></div>
+    </div>
+
+    <div id="tab-all" class="sidebar-section">
+      <input id="allSearch" class="search" placeholder="Search all demons…" oninput="renderSidebar()"/>
+      <select id="raceFilter" onchange="renderSidebar()"><option value="">All Races</option></select>
+      <div class="help">This dataset is still incomplete, but the UI no longer assumes the listed demons are the full Overclocked compendium.</div>
+      <div id="allList" class="list"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Fusion Workbench</div>
+          <div class="small">Primary flow: choose two material demons → calculate → inspect result → optionally add to chain.</div>
+        </div>
+        <div class="inline-actions">
+          <button class="btn btn-secondary btn-sm" onclick="swapParents()">Swap Parents</button>
+          <button class="btn btn-danger btn-sm" onclick="clearWorkbench()">Clear</button>
         </div>
       </div>
-      <div id="chainSteps" class="chain-steps"></div>
-      <div class="add-step-area">
-        <div style="text-align:center;color:var(--muted);font-size:.82rem;margin-bottom:4px">Add fusion step</div>
-        <div class="add-step-row">
-          <select id="nextDemonSelect" style="width:200px"><option value="">— Result demon —</option></select>
-          <button class="btn btn-primary btn-sm" onclick="addChainStep()">+ Add Step</button>
+      <div class="panel-body">
+        <div class="workbench-row">
+          <div class="field">
+            <div class="label">Parent A</div>
+            <select id="parentA"></select>
+          </div>
+          <div class="workbench-arrow arrow">×</div>
+          <div class="field">
+            <div class="label">Parent B</div>
+            <select id="parentB"></select>
+          </div>
+          <div><button class="btn btn-primary" onclick="calculateFusion()">Calculate</button></div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="grid2">
+          <div>
+            <div id="parentCards" class="empty">Select two parent demons to inspect what they contribute.</div>
+          </div>
+          <div>
+            <div class="field" style="margin-bottom:8px">
+              <div class="label">Fusion Result</div>
+              <div id="resultBox" class="result-box"><span class="small">No result yet.</span></div>
+            </div>
+            <div id="resultDetails"></div>
+          </div>
         </div>
       </div>
-      <div id="chainSummary" style="display:none" class="chain-summary">
-        <h3>📋 Final Demon Skill Summary</h3>
-        <div id="summaryContent" class="summary-skills"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Fusion Chain</div>
+          <div class="small">This is optional. Only calculated results you accept are added here.</div>
+        </div>
+        <div class="inline-actions">
+          <button class="btn btn-secondary btn-sm" onclick="copyChain()">Copy Summary</button>
+          <button class="btn btn-danger btn-sm" onclick="clearChain()">Clear Chain</button>
+        </div>
       </div>
+      <div class="panel-body">
+        <div id="chainList" class="chain"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="skillModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <strong id="skillModalTitle">Edit Skills</strong>
+      <button class="btn btn-secondary btn-sm" onclick="closeSkillModal()">Close</button>
+    </div>
+    <div class="modal-body">
+      <input id="skillSearch" class="search" placeholder="Search skills…" oninput="renderSkillModal()"/>
+      <div class="help">You are editing the skills on the demon you currently own. Command and passive slots are separate here to match the game's mental model.</div>
+      <div id="skillModalContent"></div>
     </div>
   </div>
 </div>
 
-<div class="modal-overlay" id="skillModal">
-  <div class="modal">
-    <div class="modal-header"><span class="modal-title">Choose Skill to Inherit</span><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-search"><input id="modalSearch" class="search-box" style="width:100%" placeholder="Search skill…" oninput="filterModalSkills()"/></div>
-    <div class="modal-list" id="modalSkillList"></div>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
+<div id="toast" class="toast"></div>
 
 <script>
-const DEMONS={
-"Pixie":{"lvl":2,"race":"Fairy","resists":"-w-s--","skills":{"Dia":0.1,"Charm":0.2,"Zio":4},"stats":[0,30,27,3,7,4,4]},
-"Kobold":{"lvl":3,"race":"Touki","resists":"-w---w","skills":{"Aggravate":0.1,"Hero Aid":5},"stats":[0,48,12,4,3,5,7]},
-"Kabuso":{"lvl":2,"race":"Beast","resists":"-s-w-s","skills":{"Agi":0.1,"Animal Leg":0.2,"Zan":4},"stats":[0,33,21,4,6,4,4]},
-"Nekomata":{"lvl":19,"race":"Beast","resists":"---wd-","skills":{"+Paralyze":0.1,"Watchful":0.2,"Animal Leg":0.3,"Paral Eyes":21},"stats":[0,148,46,11,4,8,12]},
-"Silky":{"lvl":24,"race":"Fairy","resists":"-wn--s","skills":{"Bufu":0.1,"Charm":0.2,"Media":26,"Mana Bonus":0},"stats":[0,155,133,9,14,9,8]},
-"Jack Frost":{"lvl":14,"race":"Fairy","resists":"-wd---","skills":{"Bufu":0.1,"Mana Bonus":0.2,"Charm":0.3,"Ice Dance":15,"Anti-Curse":16},"stats":[0,132,52,7,10,8,5]},
-"Pyro Jack":{"lvl":19,"race":"Fairy","resists":"-dw---","skills":{"Fire Dance":0.1,"Charm":0.2,"Maragi":21},"stats":[0,140,90,8,11,9,7]},
-"Kijimunaa":{"lvl":8,"race":"Fairy","resists":"-w---s","skills":{"Zan":0.1,"Mana Bonus":0.2,"Charm":0.3},"stats":[0,60,46,6,6,4,8]},
-"Kikimora":{"lvl":10,"race":"Femme","resists":"----wn","skills":{"Dia":0.1,"Devotion":0.2,"Zan":11,"Mana Bonus":12},"stats":[0,75,55,5,9,5,7]},
-"Lilim":{"lvl":15,"race":"Femme","resists":"--wn--","skills":{"Mana Bonus":0.1,"Anti-Elec":0.2,"Devotion":0.3,"Elec Dance":16,"Mute Eyes":17},"stats":[0,116,68,7,10,7,7]},
-"Bilwis":{"lvl":9,"race":"Touki","resists":"-sswn-","skills":{"Hero Aid":0.1,"Aggravate":0.2,"Race-D":10},"stats":[0,112,6,7,4,7,7]},
-"Gozuki":{"lvl":16,"race":"Touki","resists":"-rw-sw","skills":{"Berserk":0.1,"Race-O":0.2,"Aggravate":0.3,"Desperation":18},"stats":[0,182,20,13,4,10,5]},
-"Garm":{"lvl":11,"race":"Wilder","resists":"-sw-ws","skills":{"Agi":0.1,"Watchful":0.2,"Devil Speed":0.3,"Counter":14},"stats":[0,110,22,11,3,6,7]},
-"Hairy Jack":{"lvl":10,"race":"Beast","resists":"s-sw--","skills":{"Anger Hit":0.1,"Animal Leg":0.2,"+Poison":12,"Life Bonus":13},"stats":[0,84,30,7,5,5,9]},
-"Ogre":{"lvl":4,"race":"Jaki","resists":"-wsww-","skills":{"Knight Soul":0.1,"Bind":0.2},"stats":[0,72,8,9,4,5,2]},
-"Ogun":{"lvl":8,"race":"Jaki","resists":"-sw--n","skills":{"Knight Soul":0.1,"Bind":0.2,"Anger Hit":9,"Life Bonus":10,"Agi":11},"stats":[0,104,11,10,3,5,6]},
-"Heqet":{"lvl":9,"race":"Avatar","resists":"-wns-w","skills":{"Bufu":0.1,"Knight Soul":0.2,"Switch":0.3},"stats":[0,90,34,7,8,6,4]},
-"Jambavan":{"lvl":9,"race":"Genma","resists":"--wws-","skills":{"Agi":0.1,"Knight Soul":0.2,"Phantasma":0.3,"Race-O":10},"stats":[0,136,12,10,3,9,3]},
-"Sarasvati":{"lvl":12,"race":"Megami","resists":"-w---n","skills":{"Dia":0.1,"Anti-Force":0.2,"Affection":0.3,"Force Dance":14},"stats":[0,90,76,5,12,6,5]},
-"Kikuri-Hime":{"lvl":21,"race":"Megami","resists":"-w---n","skills":{"Affection":0.1,"Media":22,"Recarm":23},"stats":[0,150,105,8,14,9,6]},
-"Gagyson":{"lvl":12,"race":"Fallen","resists":"----w-","skills":{"Zio":0.1,"Life Bonus":0.2,"Sacrifice":0.3,"Elec Dance":13,"Counter":14},"stats":[0,125,40,7,8,7,6]},
-"Waira":{"lvl":7,"race":"Wilder","resists":"-w---n","skills":{"Zan":0.1,"Devil Speed":0.2,"Hero Aid":8,"Life Bonus":9},"stats":[0,78,35,6,7,5,5]},
-"Moh Shuvuu":{"lvl":7,"race":"Avian","resists":"---dws","skills":{"Bufu":0.1,"Flight":0.2},"stats":[0,72,27,6,5,5,7]},
-"Thor":{"lvl":16,"race":"Deity","resists":"---d-w","skills":{"Awakening":0.1,"Elec Dance":17,"Counter":18},"stats":[1,175,24,17,3,11,1]},
-"Angel":{"lvl":14,"race":"Divine","resists":"--s-ws","skills":{"Dia":0.1,"Blood Wine":0.2,"+Mute":15},"stats":[0,126,44,8,8,7,7]},
-"Abaddon":{"lvl":40,"race":"Vile","resists":"wsssss","skills":{"Chaos Wave":0.1,"Bufudyne":41,"Null Ice":42,"Anti-Most":43},"stats":[0,270,168,15,16,14,11]},
-"Hecate":{"lvl":42,"race":"Tyrant","resists":"-sssss","skills":{"Anti-Most":0.1,"Tyranny":0.2,"Mediarahan":43,"Pierce":44},"stats":[1,270,186,13,20,12,13]},
-"King Frost":{"lvl":22,"race":"Tyrant","resists":"-wdssn","skills":{"Mabufu":0.1,"Tyranny":0.2,"Ice Boost":23},"stats":[1,180,64,13,10,8,7]},
-"Lorelei":{"lvl":33,"race":"Fairy","resists":"---ssw","skills":{"Diarahan":0.1,"Watchful":0.2,"Charm":0.3,"Makajamaon":35},"stats":[0,200,153,8,18,7,16]},
-"Orthrus":{"lvl":35,"race":"Beast","resists":"-dw-s-","skills":{"Fire Dance":0.1,"Animal Leg":0.2,"Pierce":36,"Fire Amp":37},"stats":[0,245,88,16,9,14,12]},
-"Cerberus":{"lvl":53,"race":"Beast","resists":"srws--","skills":{"Maragidyne":0.1,"Animal Leg":0.2,"Hero Soul":54},"stats":[0,476,94,23,10,15,21]},
-"Rangda":{"lvl":49,"race":"Femme","resists":"r--wss","skills":{"Devotion":0.1,"Diajama":50,"Phys Repel":51},"stats":[0,330,183,20,12,17,16]},
-"Orobas":{"lvl":35,"race":"Fallen","resists":"--ws-n","skills":{"Mazio":0.1,"Null Curse":0.2,"Sacrifice":0.3,"Weak Kill":36,"Elec Amp":37},"stats":[0,253,148,10,18,11,12]},
-"Decarabia":{"lvl":44,"race":"Fallen","resists":"ss-w--","skills":{"Agidyne":0.1,"Sacrifice":0.2,"Shield All":45},"stats":[0,313,161,16,16,11,15]},
-"Vivian":{"lvl":45,"race":"Fairy","resists":"-s-ds-","skills":{"Drain":0.1,"Mana Surge":0.2,"Charm":0.3,"Ziodyne":46,"Elec Repel":47},"stats":[0,261,261,10,22,13,13]},
-"Alp":{"lvl":17,"race":"Fairy","resists":"--n-ws","skills":{"Tarukaja":0.1,"Charm":0.2,"Dormina":18},"stats":[0,136,70,8,12,7,6]},
-"Nue":{"lvl":20,"race":"Wilder","resists":"-sw---","skills":{"Poisma":0.1,"Devil Speed":0.2,"Mazio":21},"stats":[0,160,58,12,8,8,8]},
-"Bicorn":{"lvl":5,"race":"Beast","resists":"-w----","skills":{"Agi":0.1,"Life Bonus":0.2},"stats":[0,55,18,5,4,4,5]},
-"Cu Sith":{"lvl":13,"race":"Beast","resists":"-sw--s","skills":{"Zan":0.1,"Animal Leg":0.2,"Agi":14},"stats":[0,118,30,9,5,7,8]},
-"Succubus":{"lvl":17,"race":"Femme","resists":"--ws--","skills":{"Charm":0.1,"Mana Bonus":0.2,"Elec Dance":18},"stats":[0,128,90,7,12,7,8]},
-"Rakshasa":{"lvl":22,"race":"Jaki","resists":"-www--","skills":{"Berserk":0.1,"Life Bonus":0.2,"Phys Boost":23},"stats":[0,214,28,18,4,11,5]},
-"Oni":{"lvl":15,"race":"Jaki","resists":"-sw--w","skills":{"Berserk":0.1,"Race-O":0.2,"Sukukaja":16},"stats":[0,152,22,13,4,9,4]}
+const DEMONS = {
+  "Pixie":{"lvl":2,"race":"Fairy","resists":"-w-s--","skills":{"Dia":0.1,"Charm":0.2,"Zio":4},"stats":[0,30,27,3,7,4,4]},
+  "Kobold":{"lvl":3,"race":"Touki","resists":"-w---w","skills":{"Aggravate":0.1,"Hero Aid":5},"stats":[0,48,12,4,3,5,7]},
+  "Kabuso":{"lvl":2,"race":"Beast","resists":"-s-w-s","skills":{"Agi":0.1,"Animal Leg":0.2,"Zan":4},"stats":[0,33,21,4,6,4,4]},
+  "Nekomata":{"lvl":19,"race":"Beast","resists":"---wd-","skills":{"+Paralyze":0.1,"Watchful":0.2,"Animal Leg":0.3,"Paral Eyes":21},"stats":[0,148,46,11,4,8,12]},
+  "Silky":{"lvl":24,"race":"Fairy","resists":"-wn--s","skills":{"Bufu":0.1,"Charm":0.2,"Media":26,"Mana Bonus":0},"stats":[0,155,133,9,14,9,8]},
+  "Jack Frost":{"lvl":14,"race":"Fairy","resists":"-wd---","skills":{"Bufu":0.1,"Mana Bonus":0.2,"Charm":0.3,"Ice Dance":15,"Anti-Curse":16},"stats":[0,132,52,7,10,8,5]},
+  "Pyro Jack":{"lvl":19,"race":"Fairy","resists":"-dw---","skills":{"Fire Dance":0.1,"Charm":0.2,"Maragi":21},"stats":[0,140,90,8,11,9,7]},
+  "Kijimunaa":{"lvl":8,"race":"Fairy","resists":"-w---s","skills":{"Zan":0.1,"Mana Bonus":0.2,"Charm":0.3},"stats":[0,60,46,6,6,4,8]},
+  "Kikimora":{"lvl":10,"race":"Femme","resists":"----wn","skills":{"Dia":0.1,"Devotion":0.2,"Zan":11,"Mana Bonus":12},"stats":[0,75,55,5,9,5,7]},
+  "Lilim":{"lvl":15,"race":"Femme","resists":"--wn--","skills":{"Mana Bonus":0.1,"Anti-Elec":0.2,"Devotion":0.3,"Elec Dance":16,"Mute Eyes":17},"stats":[0,116,68,7,10,7,7]},
+  "Bilwis":{"lvl":9,"race":"Touki","resists":"-sswn-","skills":{"Hero Aid":0.1,"Aggravate":0.2,"Race-D":10},"stats":[0,112,6,7,4,7,7]},
+  "Gozuki":{"lvl":16,"race":"Touki","resists":"-rw-sw","skills":{"Berserk":0.1,"Race-O":0.2,"Aggravate":0.3,"Desperation":18},"stats":[0,182,20,13,4,10,5]},
+  "Garm":{"lvl":11,"race":"Wilder","resists":"-sw-ws","skills":{"Agi":0.1,"Watchful":0.2,"Devil Speed":0.3,"Counter":14},"stats":[0,110,22,11,3,6,7]},
+  "Hairy Jack":{"lvl":10,"race":"Beast","resists":"s-sw--","skills":{"Anger Hit":0.1,"Animal Leg":0.2,"+Poison":12,"Life Bonus":13},"stats":[0,84,30,7,5,5,9]},
+  "Ogre":{"lvl":4,"race":"Jaki","resists":"-wsww-","skills":{"Knight Soul":0.1,"Bind":0.2},"stats":[0,72,8,9,4,5,2]},
+  "Ogun":{"lvl":8,"race":"Jaki","resists":"-sw--n","skills":{"Knight Soul":0.1,"Bind":0.2,"Anger Hit":9,"Life Bonus":10,"Agi":11},"stats":[0,104,11,10,3,5,6]},
+  "Heqet":{"lvl":9,"race":"Avatar","resists":"-wns-w","skills":{"Bufu":0.1,"Knight Soul":0.2,"Switch":0.3},"stats":[0,90,34,7,8,6,4]},
+  "Jambavan":{"lvl":9,"race":"Genma","resists":"--wws-","skills":{"Agi":0.1,"Knight Soul":0.2,"Phantasma":0.3,"Race-O":10},"stats":[0,136,12,10,3,9,3]},
+  "Sarasvati":{"lvl":12,"race":"Megami","resists":"-w---n","skills":{"Dia":0.1,"Anti-Force":0.2,"Affection":0.3,"Force Dance":14},"stats":[0,90,76,5,12,6,5]},
+  "Kikuri-Hime":{"lvl":21,"race":"Megami","resists":"-w---n","skills":{"Affection":0.1,"Media":22,"Recarm":23},"stats":[0,150,105,8,14,9,6]},
+  "Gagyson":{"lvl":12,"race":"Fallen","resists":"----w-","skills":{"Zio":0.1,"Life Bonus":0.2,"Sacrifice":0.3,"Elec Dance":13,"Counter":14},"stats":[0,125,40,7,8,7,6]},
+  "Waira":{"lvl":7,"race":"Wilder","resists":"-w---n","skills":{"Zan":0.1,"Devil Speed":0.2,"Hero Aid":8,"Life Bonus":9},"stats":[0,78,35,6,7,5,5]},
+  "Moh Shuvuu":{"lvl":7,"race":"Avian","resists":"---dws","skills":{"Bufu":0.1,"Flight":0.2},"stats":[0,72,27,6,5,5,7]},
+  "Thor":{"lvl":16,"race":"Deity","resists":"---d-w","skills":{"Awakening":0.1,"Elec Dance":17,"Counter":18},"stats":[1,175,24,17,3,11,1]},
+  "Angel":{"lvl":14,"race":"Divine","resists":"--s-ws","skills":{"Dia":0.1,"Blood Wine":0.2,"+Mute":15},"stats":[0,126,44,8,8,7,7]},
+  "Abaddon":{"lvl":40,"race":"Vile","resists":"wsssss","skills":{"Chaos Wave":0.1,"Bufudyne":41,"Null Ice":42,"Anti-Most":43},"stats":[0,270,168,15,16,14,11]},
+  "Hecate":{"lvl":42,"race":"Tyrant","resists":"-sssss","skills":{"Anti-Most":0.1,"Tyranny":0.2,"Mediarahan":43,"Pierce":44},"stats":[1,270,186,13,20,12,13]},
+  "King Frost":{"lvl":22,"race":"Tyrant","resists":"-wdssn","skills":{"Mabufu":0.1,"Tyranny":0.2,"Ice Boost":23},"stats":[1,180,64,13,10,8,7]},
+  "Lorelei":{"lvl":33,"race":"Fairy","resists":"---ssw","skills":{"Diarahan":0.1,"Watchful":0.2,"Charm":0.3,"Makajamaon":35},"stats":[0,200,153,8,18,7,16]},
+  "Orthrus":{"lvl":35,"race":"Beast","resists":"-dw-s-","skills":{"Fire Dance":0.1,"Animal Leg":0.2,"Pierce":36,"Fire Amp":37},"stats":[0,245,88,16,9,14,12]},
+  "Cerberus":{"lvl":53,"race":"Beast","resists":"srws--","skills":{"Maragidyne":0.1,"Animal Leg":0.2,"Hero Soul":54},"stats":[0,476,94,23,10,15,21]},
+  "Rangda":{"lvl":49,"race":"Femme","resists":"r--wss","skills":{"Devotion":0.1,"Diajama":50,"Phys Repel":51},"stats":[0,330,183,20,12,17,16]},
+  "Orobas":{"lvl":35,"race":"Fallen","resists":"--ws-n","skills":{"Mazio":0.1,"Null Curse":0.2,"Sacrifice":0.3,"Weak Kill":36,"Elec Amp":37},"stats":[0,253,148,10,18,11,12]},
+  "Decarabia":{"lvl":44,"race":"Fallen","resists":"ss-w--","skills":{"Agidyne":0.1,"Sacrifice":0.2,"Shield All":45},"stats":[0,313,161,16,16,11,15]},
+  "Vivian":{"lvl":45,"race":"Fairy","resists":"-s-ds-","skills":{"Drain":0.1,"Mana Surge":0.2,"Charm":0.3,"Ziodyne":46,"Elec Repel":47},"stats":[0,261,261,10,22,13,13]},
+  "Alp":{"lvl":17,"race":"Fairy","resists":"--n-ws","skills":{"Tarukaja":0.1,"Charm":0.2,"Dormina":18},"stats":[0,136,70,8,12,7,6]},
+  "Nue":{"lvl":20,"race":"Wilder","resists":"-sw---","skills":{"Poisma":0.1,"Devil Speed":0.2,"Mazio":21},"stats":[0,160,58,12,8,8,8]},
+  "Bicorn":{"lvl":5,"race":"Beast","resists":"-w----","skills":{"Agi":0.1,"Life Bonus":0.2},"stats":[0,55,18,5,4,4,5]},
+  "Cu Sith":{"lvl":13,"race":"Beast","resists":"-sw--s","skills":{"Zan":0.1,"Animal Leg":0.2,"Agi":14},"stats":[0,118,30,9,5,7,8]},
+  "Succubus":{"lvl":17,"race":"Femme","resists":"--ws--","skills":{"Charm":0.1,"Mana Bonus":0.2,"Elec Dance":18},"stats":[0,128,90,7,12,7,8]},
+  "Rakshasa":{"lvl":22,"race":"Jaki","resists":"-www--","skills":{"Berserk":0.1,"Life Bonus":0.2,"Phys Boost":23},"stats":[0,214,28,18,4,11,5]},
+  "Oni":{"lvl":15,"race":"Jaki","resists":"-sw--w","skills":{"Berserk":0.1,"Race-O":0.2,"Sukukaja":16},"stats":[0,152,22,13,4,9,4]}
 };
 
-const FUSION_TABLE={
-"Fairy+Beast":"Fairy","Fairy+Femme":"Fairy","Fairy+Jaki":"Beast","Fairy+Touki":"Femme","Fairy+Wilder":"Fairy","Fairy+Fallen":"Femme","Fairy+Megami":"Fairy","Fairy+Divine":"Fairy","Fairy+Avian":"Fairy","Fairy+Genma":"Fairy","Fairy+Avatar":"Fairy","Fairy+Fairy":null,
-"Beast+Femme":"Fairy","Beast+Jaki":"Wilder","Beast+Touki":"Jaki","Beast+Wilder":"Beast","Beast+Fallen":"Jaki","Beast+Megami":"Fairy","Beast+Divine":"Fairy","Beast+Avian":"Beast","Beast+Genma":"Beast","Beast+Avatar":"Genma","Beast+Beast":null,
-"Femme+Jaki":"Beast","Femme+Touki":"Femme","Femme+Wilder":"Femme","Femme+Fallen":"Femme","Femme+Megami":"Megami","Femme+Divine":"Megami","Femme+Avian":"Femme","Femme+Genma":"Femme","Femme+Avatar":"Femme","Femme+Femme":null,
-"Jaki+Touki":"Jaki","Jaki+Wilder":"Jaki","Jaki+Fallen":"Fallen","Jaki+Megami":"Femme","Jaki+Divine":"Femme","Jaki+Avian":"Wilder","Jaki+Genma":"Genma","Jaki+Avatar":"Jaki","Jaki+Jaki":null,
-"Touki+Wilder":"Touki","Touki+Fallen":"Touki","Touki+Megami":"Femme","Touki+Divine":"Femme","Touki+Avian":"Touki","Touki+Genma":"Touki","Touki+Avatar":"Avatar","Touki+Touki":null,
-"Wilder+Fallen":"Wilder","Wilder+Megami":"Fairy","Wilder+Divine":"Fairy","Wilder+Avian":"Wilder","Wilder+Genma":"Genma","Wilder+Avatar":"Avatar","Wilder+Wilder":null,
-"Fallen+Megami":"Femme","Fallen+Divine":"Femme","Fallen+Avian":"Fallen","Fallen+Genma":"Fallen","Fallen+Avatar":"Fallen","Fallen+Fallen":null,
-"Megami+Divine":"Megami","Megami+Avian":"Megami","Megami+Genma":"Megami","Megami+Avatar":"Megami","Megami+Megami":null,
-"Divine+Avian":"Divine","Divine+Genma":"Genma","Divine+Avatar":"Divine","Divine+Divine":null,
-"Avian+Genma":"Avian","Avian+Avatar":"Avian","Avian+Avian":null,
-"Genma+Avatar":"Genma","Genma+Genma":null,
-"Avatar+Avatar":null
+const FUSION_TABLE = {
+  "Fairy+Beast":"Fairy","Fairy+Femme":"Fairy","Fairy+Jaki":"Beast","Fairy+Touki":"Femme","Fairy+Wilder":"Fairy","Fairy+Fallen":"Femme","Fairy+Megami":"Fairy","Fairy+Divine":"Fairy","Fairy+Avian":"Fairy","Fairy+Genma":"Fairy","Fairy+Avatar":"Fairy","Fairy+Fairy":null,
+  "Beast+Femme":"Fairy","Beast+Jaki":"Wilder","Beast+Touki":"Jaki","Beast+Wilder":"Beast","Beast+Fallen":"Jaki","Beast+Megami":"Fairy","Beast+Divine":"Fairy","Beast+Avian":"Beast","Beast+Genma":"Beast","Beast+Avatar":"Genma","Beast+Beast":null,
+  "Femme+Jaki":"Beast","Femme+Touki":"Femme","Femme+Wilder":"Femme","Femme+Fallen":"Femme","Femme+Megami":"Megami","Femme+Divine":"Megami","Femme+Avian":"Femme","Femme+Genma":"Femme","Femme+Avatar":"Femme","Femme+Femme":null,
+  "Jaki+Touki":"Jaki","Jaki+Wilder":"Jaki","Jaki+Fallen":"Fallen","Jaki+Megami":"Femme","Jaki+Divine":"Femme","Jaki+Avian":"Wilder","Jaki+Genma":"Genma","Jaki+Avatar":"Jaki","Jaki+Jaki":null,
+  "Touki+Wilder":"Touki","Touki+Fallen":"Touki","Touki+Megami":"Femme","Touki+Divine":"Femme","Touki+Avian":"Touki","Touki+Genma":"Touki","Touki+Avatar":"Avatar","Touki+Touki":null,
+  "Wilder+Fallen":"Wilder","Wilder+Megami":"Fairy","Wilder+Divine":"Fairy","Wilder+Avian":"Wilder","Wilder+Genma":"Genma","Wilder+Avatar":"Avatar","Wilder+Wilder":null,
+  "Fallen+Megami":"Femme","Fallen+Divine":"Femme","Fallen+Avian":"Fallen","Fallen+Genma":"Fallen","Fallen+Avatar":"Fallen","Fallen+Fallen":null,
+  "Megami+Divine":"Megami","Megami+Avian":"Megami","Megami+Genma":"Megami","Megami+Avatar":"Megami","Megami+Megami":null,
+  "Divine+Avian":"Divine","Divine+Genma":"Genma","Divine+Avatar":"Divine","Divine+Divine":null,
+  "Avian+Genma":"Avian","Avian+Avatar":"Avian","Avian+Avian":null,
+  "Genma+Avatar":"Genma","Genma+Genma":null,
+  "Avatar+Avatar":null
 };
 
-const SKILL_POOL=[
-"Agi","Bufu","Zio","Zan","Maragi","Mabufu","Mazio","Mazan",
-"Agidyne","Bufudyne","Ziodyne","Zandyne","Maragidyne",
-"Dia","Media","Diarahan","Mediarahan","Recarm","Amrita",
-"Tarukaja","Rakukaja","Sukukaja","Dekaja","Dekunda",
-"Mana Bonus","Life Bonus","Mana Surge","Life Aid","Phys Boost",
-"Fire Boost","Ice Boost","Elec Boost","Force Boost",
-"Fire Amp","Ice Amp","Elec Amp","Force Amp",
-"Pierce","Retaliate","Counter","Null Ice","Null Fire","Anti-Most",
-"Race-D","Race-O","Fire Dance","Ice Dance","Elec Dance","Force Dance",
-"Charm","+Paralyze","+Mute","+Poison","Paral Eyes","Mute Eyes","Bind",
-"Devotion","Affection","Sacrifice","Knight Soul","Hero Aid","Hero Soul",
-"Watchful","Aggravate","Animal Leg","Devil Speed","Flight",
-"Awakening","Tyranny","Berserk","Desperation","Blood Wine",
-"Anti-Curse","Anti-Elec","Anti-Force","Switch","Phantasma","Dormina",
-"Drain","Diajama","Gigajama","Makajamaon",
-"Chaos Wave","Weak Kill","Shield All","Phys Repel","Elec Repel",
-"Null Curse","Poisma","Anger Hit"
-].filter((v,i,a)=>a.indexOf(v)===i).sort();
+const CMD_SKILLS = new Set([
+  'Agi','Bufu','Zio','Zan','Maragi','Mabufu','Mazio','Mazan','Agidyne','Bufudyne','Ziodyne','Zandyne','Maragidyne',
+  'Dia','Media','Diarahan','Mediarahan','Recarm','Amrita','Tarukaja','Rakukaja','Sukukaja','Dekaja','Dekunda',
+  'Fire Dance','Ice Dance','Elec Dance','Force Dance','Berserk','Anger Hit','Race-D','Race-O','Switch','Sacrifice',
+  'Bind','Charm','+Paralyze','+Mute','+Poison','Dormina','Drain','Diajama','Gigajama','Makajamaon','Poisma','Blood Wine',
+  'Chaos Wave','Weak Kill','Shield All','Tyranny','Devotion','Affection','Desperation','Knight Soul','Phantasma','Mute Eyes','Paral Eyes'
+]);
 
-let selectedDemon=null,chain=[],pendingSlot=null,lastFusionResultName=null;
-const STAT_LABELS=['Str','HP','MP','St','Ma','Vi','Ag'];
-const RESIST_LABELS=['Phy','Fir','Ice','Ele','For','Cur'];
-const RESIST_MAP={'-':'res-x','w':'res-w','r':'res-r','d':'res-d','n':'res-n','s':'res-s'};
-const RESIST_DISPLAY={'-':'–','w':'Wk','r':'Rp','d':'Dr','n':'Nu','s':'Str'};
-function inn(d){return Object.entries(d.skills).filter(([,v])=>v<1).map(([k])=>k);}
-function lrn(d){return Object.entries(d.skills).filter(([,v])=>v>=1).map(([k,v])=>({name:k,lvl:v}));}
-function rc(c){return RESIST_MAP[c]||'res-x';}
-function rl(c){return RESIST_DISPLAY[c]||c;}
+const ALL_SKILLS = [...new Set(Object.values(DEMONS).flatMap(d=>Object.keys(d.skills)).concat([
+  'Agi','Bufu','Zio','Zan','Maragi','Mabufu','Mazio','Mazan','Agidyne','Bufudyne','Ziodyne','Zandyne','Maragidyne',
+  'Dia','Media','Diarahan','Mediarahan','Recarm','Amrita','Tarukaja','Rakukaja','Sukukaja','Dekaja','Dekunda','Fire Dance',
+  'Ice Dance','Elec Dance','Force Dance','Mana Bonus','Life Bonus','Mana Surge','Life Aid','Phys Boost','Fire Boost','Ice Boost',
+  'Elec Boost','Force Boost','Fire Amp','Ice Amp','Elec Amp','Force Amp','Pierce','Counter','Retaliate','Hero Aid','Hero Soul',
+  'Watchful','Aggravate','Animal Leg','Devil Speed','Flight','Awakening','Null Curse','Anti-Curse','Anti-Elec','Anti-Force',
+  'Elec Repel','Phys Repel'
+]))].sort();
 
+const RES_NAMES = ['Phys','Fire','Ice','Elec','Force','Curse'];
+const RES_SHOW = {'-':'—','w':'Weak','s':'Resist','n':'Null','d':'Drain','r':'Repel'};
+
+let appState = {
+  tab:'compendium',
+  selectedSidebarDemon:null,
+  owned:{},
+  parentA:'',
+  parentB:'',
+  lastCalc:null,
+  chain:[],
+  editingDemon:null
+};
+
+function isCmd(skill){ return CMD_SKILLS.has(skill); }
+function getSkillEntries(name){
+  const d = DEMONS[name];
+  return Object.entries(d.skills).map(([skill,lvl])=>({skill,lvl,type:isCmd(skill)?'cmd':'pas'}));
+}
+function baseActiveSkills(name){ return getSkillEntries(name).filter(s=>s.lvl < 1).map(s=>s.skill); }
+function baseLearnedSkills(name){ return getSkillEntries(name).filter(s=>s.lvl >= 1).map(s=>s.skill); }
+function ensureOwnedState(name){
+  if(!appState.owned[name]){
+    const base = [...baseActiveSkills(name), ...baseLearnedSkills(name)];
+    appState.owned[name] = {owned:false, extraSkills:[], currentSkills:[...new Set(base)]};
+  }
+  return appState.owned[name];
+}
+function currentSkills(name){
+  const st = ensureOwnedState(name);
+  return [...new Set(st.currentSkills)];
+}
+function splitSkills(skills){
+  const cmd = skills.filter(isCmd).slice(0,3);
+  const pas = skills.filter(s=>!isCmd(s)).slice(0,3);
+  return {cmd,pas};
+}
+function getResClass(c){
+  if(c==='w') return 'bad';
+  if(c==='s') return 'good';
+  if(c==='n'||c==='d'||c==='r') return 'special';
+  return 'neutral';
+}
+function switchTab(tab, btn){
+  appState.tab = tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.sidebar-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  renderSidebar();
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),2200);
+}
 function init(){
   const races=[...new Set(Object.values(DEMONS).map(d=>d.race))].sort();
   const rf=document.getElementById('raceFilter');
   races.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;rf.appendChild(o);});
-  buildDemonList();
-  populateFusionSelects();
-  populateNextDemonSelect();
-}
-
-function buildDemonList(nf='',rf=''){
-  const list=document.getElementById('demonList');list.innerHTML='';
-  Object.entries(DEMONS)
-    .filter(([n,d])=>n.toLowerCase().includes(nf.toLowerCase())&&(!rf||d.race===rf))
-    .sort(([,a],[,b])=>a.lvl-b.lvl)
-    .forEach(([name,d])=>{
-      const el=document.createElement('div');
-      el.className='demon-entry'+(selectedDemon===name?' selected':'');
-      el.innerHTML=`<span class="demon-name">${name}</span><span class="demon-meta">Lv${d.lvl} ${d.race}</span>`;
-      el.onclick=()=>selectDemon(name);
-      list.appendChild(el);
-    });
-}
-function filterDemons(){buildDemonList(document.getElementById('searchInput').value,document.getElementById('raceFilter').value);}
-
-function selectDemon(name){
-  selectedDemon=name;
-  chain=[{demonName:name,inheritedSkills:[],chosenSlots:Array(8).fill(null)}];
-  filterDemons();
-  renderSelectedPanel();
+  Object.keys(DEMONS).forEach(ensureOwnedState);
+  renderSidebar();
+  populateParentSelectors();
+  renderWorkbench();
   renderChain();
-  updateSummary();
-  document.getElementById('chainSection').style.display='block';
-  document.getElementById('fusionCalc').style.display='block';
 }
-function renderSelectedPanel(){
-  if(!selectedDemon)return;
-  document.getElementById('selectedDemonPanel').innerHTML=buildDemonCard(selectedDemon,DEMONS[selectedDemon],0,true);
+function renderSidebar(){
+  renderOwnedList();
+  renderAllList();
 }
-
-function buildDemonCard(name,d,chainIdx,isSource){
-  const i2=inn(d),l2=lrn(d),step=chain[chainIdx]||{inheritedSkills:[],chosenSlots:Array(8).fill(null)};
-  const inherited=step.inheritedSkills,chosen=step.chosenSlots;
-  let stats=STAT_LABELS.map((l,i)=>`<div class="stat-chip"><span>${l}</span>${d.stats[i]}</div>`).join('');
-  let res=d.resists.split('').map((c,i)=>`<div class="res ${rc(c)}" title="${RESIST_LABELS[i]}: ${rl(c)}">${rl(c)}</div>`).join('');
-  let slots='';
-  i2.forEach(sk=>{slots+=`<div class="skill-slot innate"><span class="skill-tag tag-innate">Innate</span><span class="skill-name">${sk}</span></div>`;});
-  l2.forEach(({name:sk,lvl})=>{slots+=`<div class="skill-slot innate" style="opacity:.75"><span class="skill-tag tag-learned">+Lv${lvl}</span><span class="skill-name">${sk}</span><span class="skill-unlock">at Lv${lvl}</span></div>`;});
-  inherited.forEach((sk,i)=>{
-    const src=findSource(sk,chainIdx);
-    slots+=`<div class="skill-slot inherited"><span class="skill-tag tag-inherited">Inherited</span><span class="skill-name">${sk}</span><span class="skill-unlock">${src}</span><div class="prob-bar" title="~75% chance"><div class="prob-fill" style="width:75%"></div></div><button class="remove-btn" onclick="removeInherited(${chainIdx},${i})">✕</button></div>`;
+function demonMatches(name, search, race){
+  const d = DEMONS[name];
+  return name.toLowerCase().includes(search.toLowerCase()) && (!race || d.race===race);
+}
+function demonRow(name, showOnlyOwned=false){
+  const d = DEMONS[name];
+  const st = ensureOwnedState(name);
+  if(showOnlyOwned && !st.owned) return '';
+  return `<div class="demon-row ${appState.selectedSidebarDemon===name?'selected':''}" onclick="selectSidebarDemon('${esc(name)}')">
+    <span class="star ${st.owned?'owned':''}" onclick="event.stopPropagation();toggleOwned('${esc(name)}')">★</span>
+    <div class="demon-meta">
+      <div class="demon-name">${name}</div>
+      <div class="demon-sub">Lv${d.lvl} · ${d.race}</div>
+    </div>
+    ${st.owned?'<span class="badge">Owned</span>':''}
+  </div>`;
+}
+function renderOwnedList(){
+  const q=document.getElementById('ownedSearch').value||'';
+  const ownedNames=Object.keys(DEMONS).filter(n=>ensureOwnedState(n).owned && demonMatches(n,q,''));
+  document.getElementById('ownedList').innerHTML = ownedNames.length ? ownedNames.sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl).map(n=>demonRow(n,true)).join('') : '<div class="empty">No owned demons match. Click ★ in All Demons to add some.</div>';
+}
+function renderAllList(){
+  const q=document.getElementById('allSearch').value||'';
+  const race=document.getElementById('raceFilter').value||'';
+  const names=Object.keys(DEMONS).filter(n=>demonMatches(n,q,race)).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
+  document.getElementById('allList').innerHTML = names.map(n=>demonRow(n,false)).join('');
+}
+function toggleOwned(name){
+  const st=ensureOwnedState(name);st.owned=!st.owned;
+  populateParentSelectors();renderSidebar();
+  toast(st.owned?`${name} added to My Compendium`:`${name} removed from My Compendium`);
+}
+function selectSidebarDemon(name){
+  appState.selectedSidebarDemon=name;renderSidebar();
+  appState.editingDemon=name;
+  openSkillModal(name);
+}
+function populateParentSelectors(){
+  const owned=Object.keys(DEMONS).filter(n=>ensureOwnedState(n).owned).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
+  const pool = owned.length ? owned : Object.keys(DEMONS).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
+  ['parentA','parentB'].forEach(id=>{
+    const sel=document.getElementById(id); const current = appState[id];
+    sel.innerHTML='<option value="">— Select demon —</option>';
+    pool.forEach(name=>{
+      const d=DEMONS[name]; const o=document.createElement('option');
+      o.value=name; o.textContent=`${name} (Lv${d.lvl} ${d.race})${ensureOwnedState(name).owned?' ★':''}`;
+      sel.appendChild(o);
+    });
+    sel.value=current||'';
+    sel.onchange=()=>{appState[id]=sel.value;renderWorkbench();};
   });
-  chosen.forEach((sk,i)=>{if(sk)slots+=`<div class="skill-slot inherited"><span class="skill-tag tag-inherited" style="color:var(--accent)">Chosen</span><span class="skill-name">${sk}</span><button class="remove-btn" onclick="removeChosen(${chainIdx},${i})">✕</button></div>`;});
-  const filled=i2.length+l2.length+inherited.length+chosen.filter(Boolean).length;
-  const rem=Math.max(0,8-filled);
-  for(let i=0;i<rem;i++){slots+=`<div class="skill-slot empty" onclick="openModal(${chainIdx},${i})"><span class="skill-tag tag-empty">Empty</span><span class="skill-name" style="color:var(--empty)">— click to assign —</span><button class="add-btn">＋</button></div>`;}
-  return `<div class="demon-panel"><div class="demon-header"><span class="demon-title">${isSource?'Source: ':''}${name}</span><span class="badge">Lv${d.lvl}</span><span class="badge">${d.race}</span></div><div class="demon-body"><div><div class="info-row">Base Stats</div><div class="stats-row">${stats}</div><div class="info-row" style="margin-top:6px">Resistances</div><div class="resist-row">${res}</div></div><div class="skills-section"><div class="info-row">Skills — ${filled}/8 used · ${rem} open</div><div class="skill-slots">${slots}</div></div></div></div>`;
 }
-
-function getAllPassable(stepIdx){
-  const step=chain[stepIdx];if(!step)return[];
-  const d=DEMONS[step.demonName];if(!d)return[];
-  return[...new Set([...inn(d),...lrn(d).map(s=>s.name),...step.inheritedSkills,...step.chosenSlots.filter(Boolean)])];
+function swapParents(){
+  const a=appState.parentA,b=appState.parentB;appState.parentA=b;appState.parentB=a;populateParentSelectors();renderWorkbench();
 }
-function findSource(skillName,chainIdx){
-  for(let i=chainIdx-1;i>=0;i--){
-    const d=DEMONS[chain[i].demonName];
-    if(d&&(inn(d).includes(skillName)||lrn(d).some(s=>s.name===skillName)))return`via ${chain[i].demonName}`;
-    if(chain[i].inheritedSkills.includes(skillName))return`passed step ${i+1}`;
+function clearWorkbench(){
+  appState.parentA='';appState.parentB='';appState.lastCalc=null;populateParentSelectors();renderWorkbench();
+}
+function renderWorkbench(){
+  const a=appState.parentA,b=appState.parentB;
+  const parentCards=document.getElementById('parentCards');
+  const resultBox=document.getElementById('resultBox');
+  const resultDetails=document.getElementById('resultDetails');
+  if(!a && !b){
+    parentCards.innerHTML='<div class="empty">Select two parent demons. Owned demons appear in the dropdowns first once you mark them in My Compendium.</div>';
+  }else{
+    parentCards.innerHTML = [a,b].filter(Boolean).map((name,idx)=>compactCard(name, currentSkills(name), `Parent ${idx===0?'A':'B'}`)).join('');
   }
-  return'';
+  if(!appState.lastCalc){
+    resultBox.innerHTML='<span class="small">No result yet.</span>';
+    resultDetails.innerHTML='';
+  }else{
+    const r=appState.lastCalc;
+    resultBox.innerHTML = r.error ? `<span style="color:var(--bad);font-weight:800">${r.error}</span>` : `<span class="result-name">${r.result}</span><span class="badge">${r.resultRace}</span><span class="small">Average level ${r.avgLvl}</span><button class="btn btn-primary btn-sm" onclick="addResultToChain()">Add to Chain</button>`;
+    resultDetails.innerHTML = r.error ? '' : `<div style="margin-top:8px">${compactCard(r.result, r.previewSkills, 'Calculated Result', true)}</div><div class="help" style="margin-top:8px">Preview uses both parents' current skills, then applies command/passive slot caps separately (3 command + 3 passive shown).</div>`;
+  }
 }
-
-function openModal(chainIdx,slotIdx){
-  pendingSlot={chainIdx,slotIdx};
-  document.getElementById('skillModal').classList.add('open');
-  document.getElementById('modalSearch').value='';
-  renderModalSkills('');
-  setTimeout(()=>document.getElementById('modalSearch').focus(),50);
+function getFusionRace(rA,rB){
+  const k1=`${rA}+${rB}`,k2=`${rB}+${rA}`;
+  if(k1 in FUSION_TABLE) return FUSION_TABLE[k1];
+  if(k2 in FUSION_TABLE) return FUSION_TABLE[k2];
+  return undefined;
 }
-function closeModal(){document.getElementById('skillModal').classList.remove('open');pendingSlot=null;}
-function filterModalSkills(){renderModalSkills(document.getElementById('modalSearch').value);}
-function renderModalSkills(filter){
-  let avail=[...SKILL_POOL],prevPool=[];
-  if(pendingSlot&&pendingSlot.chainIdx>0){prevPool=getAllPassable(pendingSlot.chainIdx-1);avail=[...new Set([...prevPool,...SKILL_POOL])].sort();}
-  const already=pendingSlot?chain[pendingSlot.chainIdx]?.inheritedSkills||[]:[];
-  document.getElementById('modalSkillList').innerHTML=avail.filter(s=>s.toLowerCase().includes(filter.toLowerCase())).map(s=>{
-    const fromP=prevPool.includes(s),used=already.includes(s);
-    return `<div class="modal-skill-row" style="${used?'opacity:.35;pointer-events:none':''}" onclick="${used?'':` pickSkill('${s.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')`}">
-      <span class="modal-skill-name">${s}</span>
-      <span class="modal-skill-note">${used?'added':fromP?'✓ from parent':''}</span>
+function calculateFusion(){
+  const a=appState.parentA,b=appState.parentB;
+  if(!a||!b){ toast('Pick both parent demons first'); return; }
+  if(a===b){ appState.lastCalc={error:'You cannot fuse a demon with itself.'}; renderWorkbench(); return; }
+  const dA=DEMONS[a], dB=DEMONS[b];
+  const race = getFusionRace(dA.race,dB.race);
+  if(race===undefined){ appState.lastCalc={error:'This race combination is not in the current fusion table subset.'}; renderWorkbench(); return; }
+  if(race===null){ appState.lastCalc={error:'Same-race / special fusion path is not handled in this build yet.'}; renderWorkbench(); return; }
+  const avgLvl=Math.floor((dA.lvl+dB.lvl)/2);
+  const candidates=Object.entries(DEMONS).filter(([n,d])=>d.race===race&&n!==a&&n!==b).sort(([,x],[,y])=>x.lvl-y.lvl);
+  let best=null;
+  for(const [n,d] of candidates){ if(d.lvl>=avgLvl){ best=[n,d]; break; } }
+  if(!best && candidates.length) best=candidates[candidates.length-1];
+  if(!best){ appState.lastCalc={error:`Would produce ${race}, but no demon of that race exists in the current dataset.`}; renderWorkbench(); return; }
+  const [resultName,resultData]=best;
+  const pool=[...new Set([...currentSkills(a),...currentSkills(b),...baseActiveSkills(resultName),...baseLearnedSkills(resultName)])];
+  const cmd=pool.filter(isCmd).slice(0,3);
+  const pas=pool.filter(s=>!isCmd(s)).slice(0,3);
+  appState.lastCalc={
+    parentA:a,parentB:b,result:resultName,resultRace:race,avgLvl,
+    previewSkills:[...cmd,...pas]
+  };
+  renderWorkbench();
+}
+function addResultToChain(){
+  if(!appState.lastCalc) return;
+  appState.chain.push({...appState.lastCalc});
+  renderChain();
+  toast(`${appState.lastCalc.result} added to chain`);
+}
+function compactCard(name, skills, label='', open=false){
+  const d=DEMONS[name];
+  const split=splitSkills(skills||[]);
+  const res=d.resists.split('').map((c,i)=>`<div class="res-chip ${getResClass(c)}"><span>${RES_NAMES[i]}</span><strong>${RES_SHOW[c]||'—'}</strong></div>`).join('');
+  const stats=['Str','HP','MP','St','Ma','Vi','Ag'].map((s,i)=>`<div class="stat"><span>${s}</span>${d.stats[i]}</div>`).join('');
+  const cmdSlots=[0,1,2].map(i=>skillSlot(split.cmd[i], 'cmd')).join('');
+  const pasSlots=[0,1,2].map(i=>skillSlot(split.pas[i], 'pas')).join('');
+  const bodyId='body-'+Math.random().toString(36).slice(2);
+  return `<div class="compact-card">
+    <div class="compact-head" onclick="toggleBody('${bodyId}')">
+      <div class="compact-main">
+        ${label?`<span class="badge">${label}</span>`:''}
+        <span class="compact-title">${name}</span>
+        <span class="badge">Lv${d.lvl}</span>
+        <span class="badge">${d.race}</span>
+      </div>
+      <span class="small">details</span>
+    </div>
+    <div id="${bodyId}" class="compact-body ${open?'open':''}">
+      <div class="stats">${stats}</div>
+      <div class="resists">${res}</div>
+      <div class="skill-columns">
+        <div class="skill-box"><div class="skill-head cmd">Command slots (3)</div><div class="skill-list">${cmdSlots}</div></div>
+        <div class="skill-box"><div class="skill-head pas">Passive slots (3)</div><div class="skill-list">${pasSlots}</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+function skillSlot(skill, type){
+  if(!skill) return `<div class="skill-slot empty">Empty ${type==='cmd'?'command':'passive'} slot</div>`;
+  return `<div class="skill-slot"><div class="skill-left"><span class="skill-type-pill ${type}">${type.toUpperCase()}</span><span>${skill}</span></div></div>`;
+}
+function toggleBody(id){
+  const el=document.getElementById(id); if(el) el.classList.toggle('open');
+}
+function renderChain(){
+  const wrap=document.getElementById('chainList');
+  if(!appState.chain.length){ wrap.innerHTML='<div class="empty">No chain yet. Use Calculate, then Add to Chain.</div>'; return; }
+  wrap.innerHTML = appState.chain.map((step,idx)=>{
+    const bodyId='chain-'+idx;
+    return `<div class="chain-item">
+      <div class="chain-summary" onclick="toggleBody('${bodyId}')">
+        <div class="chain-main">
+          <span class="badge">Step ${idx+1}</span>
+          <strong>${step.parentA}</strong>
+          <span class="arrow">×</span>
+          <strong>${step.parentB}</strong>
+          <span class="arrow">→</span>
+          <strong style="color:var(--good)">${step.result}</strong>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeChainStep(${idx})">Remove</button>
+      </div>
+      <div id="${bodyId}" class="chain-body">
+        <div class="grid2">
+          <div>
+            ${compactCard(step.parentA, currentSkills(step.parentA), 'Parent A')}
+            <div style="height:8px"></div>
+            ${compactCard(step.parentB, currentSkills(step.parentB), 'Parent B')}
+          </div>
+          <div>
+            ${compactCard(step.result, step.previewSkills, 'Result', true)}
+          </div>
+        </div>
+      </div>
     </div>`;
   }).join('');
 }
-function pickSkill(sk){
-  if(!pendingSlot)return;
-  const{chainIdx}=pendingSlot;
-  if(!chain[chainIdx].inheritedSkills.includes(sk))chain[chainIdx].inheritedSkills.push(sk);
-  closeModal();renderSelectedPanel();renderChain();updateSummary();
-}
-function removeInherited(ci,i){chain[ci].inheritedSkills.splice(i,1);renderSelectedPanel();renderChain();updateSummary();}
-function removeChosen(ci,i){chain[ci].chosenSlots[i]=null;renderSelectedPanel();renderChain();updateSummary();}
-
-function populateNextDemonSelect(){
-  const sel=document.getElementById('nextDemonSelect');
-  sel.innerHTML='<option value="">— Result demon —</option>';
-  Object.entries(DEMONS).sort(([,a],[,b])=>a.lvl-b.lvl).forEach(([name,d])=>{
-    const o=document.createElement('option');o.value=name;o.textContent=`${name} (Lv${d.lvl} ${d.race})`;sel.appendChild(o);
-  });
-}
-function addChainStep(forceName){
-  const name=forceName||document.getElementById('nextDemonSelect').value;
-  if(!name)return;
-  chain.push({demonName:name,inheritedSkills:[],chosenSlots:Array(8).fill(null)});
-  document.getElementById('nextDemonSelect').value='';
-  renderChain();updateSummary();
-}
-function clearChain(){
-  if(chain.length<2)return;
-  chain=[chain[0]];renderChain();updateSummary();toast('Chain cleared');
-}
-function removeStep(idx){chain.splice(idx,1);renderChain();updateSummary();}
-
-function renderChain(){
-  const c=document.getElementById('chainSteps');c.innerHTML='';
-  chain.forEach((step,idx)=>{
-    if(idx===0)return;
-    const d=DEMONS[step.demonName];if(!d)return;
-    const i2=inn(d),inh=step.inheritedSkills;
-    const el=document.createElement('div');el.className='chain-step';
-    const mini=[...i2.map(s=>`<span class="mini-skill inn">${s}</span>`),...inh.map(s=>`<span class="mini-skill inh">${s}</span>`)].join('');
-    el.innerHTML=`<div class="chain-step-header" onclick="toggleStep(this)"><div class="step-summary"><span class="step-num">Step ${idx}</span><span class="step-demon">${step.demonName}</span><span class="badge">Lv${d.lvl} ${d.race}</span><div class="step-skills-mini">${mini||'<span style="color:var(--muted);font-size:.7rem">no skills</span>'}</div></div><div class="step-actions"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openModal(${idx},-1)">+ Skill</button><button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeStep(${idx})">✕</button><span class="expand-icon">▼</span></div></div><div class="chain-step-body">${buildDemonCard(step.demonName,d,idx,false)}<div class="section-label">Skill Handoff from Previous Step</div>${buildTransitionView(idx)}</div>`;
-    c.appendChild(el);
-  });
-}
-function buildTransitionView(si){
-  const prev=chain[si-1],curr=chain[si],pd=DEMONS[prev.demonName];if(!pd)return'';
-  const pool=getAllPassable(si-1),inh=curr.inheritedSkills;
-  let rows=pool.map(s=>{
-    const p=inh.includes(s);
-    return `<div style="display:flex;gap:7px;align-items:center;padding:2px 4px;font-size:.8rem;border-radius:3px;${p?'background:#0a1810':''}"><span style="color:${p?'#4caf85':'#3a3a3a'}">${p?'✔':'·'}</span><span style="flex:1">${s}</span><span style="font-size:.7rem;color:${p?'#5b9bd5':'var(--muted)'}">${p?'→ inherited':'dropped'}</span></div>`;
-  }).join('');
-  if(!pool.length)rows='<span style="color:var(--muted);font-size:.8rem">No skills from previous step.</span>';
-  return `<div style="background:#060606;border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="font-size:.7rem;color:var(--muted);margin-bottom:5px"><b style="color:var(--text)">${prev.demonName}</b> → <b style="color:var(--text)">${curr.demonName}</b> · ${inh.length}/${pool.length} inherited</div>${rows}</div>`;
-}
-function toggleStep(h){
-  const b=h.nextElementSibling,ic=h.querySelector('.expand-icon');
-  b.classList.toggle('open');ic.textContent=b.classList.contains('open')?'▲':'▼';
-}
-
-function populateFusionSelects(){
-  ['fusionA','fusionB'].forEach(id=>{
-    const sel=document.getElementById(id);
-    sel.innerHTML=`<option value="">Parent ${id==='fusionA'?'A':'B'}…</option>`;
-    Object.entries(DEMONS).sort(([,a],[,b])=>a.lvl-b.lvl).forEach(([name,d])=>{
-      const o=document.createElement('option');o.value=name;o.textContent=`${name} (Lv${d.lvl} ${d.race})`;sel.appendChild(o);
-    });
-  });
-}
-function getFusionResult(rA,rB){
-  const k1=`${rA}+${rB}`,k2=`${rB}+${rA}`;
-  if(k1 in FUSION_TABLE)return FUSION_TABLE[k1];
-  if(k2 in FUSION_TABLE)return FUSION_TABLE[k2];
-  return undefined;
-}
-function calcFusion(){
-  const nA=document.getElementById('fusionA').value,nB=document.getElementById('fusionB').value;
-  const res=document.getElementById('fusionResult'),note=document.getElementById('fusionNote'),btn=document.getElementById('useFusionBtn');
-  lastFusionResultName=null;
-  if(!nA||!nB){res.textContent='—';res.className='fusion-result none';note.textContent='';btn.style.display='none';return;}
-  if(nA===nB){res.textContent='Same demon';res.className='fusion-result none';note.textContent='Cannot fuse a demon with itself.';btn.style.display='none';return;}
-  const dA=DEMONS[nA],dB=DEMONS[nB],rr=getFusionResult(dA.race,dB.race);
-  if(rr===null){res.textContent='Special fusion';res.className='fusion-result none';note.textContent='Same-race fusion — result is determined by level average rules.';btn.style.display='none';return;}
-  if(rr===undefined){res.textContent='Unknown';res.className='fusion-result none';note.textContent='Race combination not in table.';btn.style.display='none';return;}
-  const avg=Math.floor((dA.lvl+dB.lvl)/2);
-  const cands=Object.entries(DEMONS).filter(([n,d])=>d.race===rr&&n!==nA&&n!==nB).sort(([,a],[,b])=>a.lvl-b.lvl);
-  let best=null;
-  for(const[n,d]of cands){if(d.lvl>=avg){best=[n,d];break;}}
-  if(!best&&cands.length)best=cands[cands.length-1];
-  if(!best){res.textContent=`${rr} (none)`;res.className='fusion-result none';note.textContent=`Would be a ${rr} but none in compendium.`;btn.style.display='none';return;}
-  const[bn,bd]=best;
-  res.textContent=`${bn} (Lv${bd.lvl})`;res.className='fusion-result';
-  note.textContent=`${nA} [${dA.race} Lv${dA.lvl}] × ${nB} [${dB.race} Lv${dB.lvl}] → ${rr} · avg Lv${avg} → ${bn}`;
-  lastFusionResultName=bn;btn.style.display='';
-}
-function useFusionResult(){
-  if(!lastFusionResultName)return;
-  addChainStep(lastFusionResultName);
-  toast(`Added ${lastFusionResultName} as next step`,'success');
-}
-
-function updateSummary(){
-  const panel=document.getElementById('chainSummary'),content=document.getElementById('summaryContent');
-  if(chain.length<2){panel.style.display='none';return;}
-  panel.style.display='block';
-  const last=chain[chain.length-1],d=DEMONS[last.demonName];
-  if(!d){panel.style.display='none';return;}
-  const skills=[
-    ...inn(d).map(s=>({name:s,type:'confirmed',note:'Innate'})),
-    ...lrn(d).map(s=>({name:s.name,type:'confirmed',note:`Lv${s.lvl}`})),
-    ...last.inheritedSkills.map(s=>({name:s,type:'probable',note:'~75% inherit chance'}))
-  ];
-  if(!skills.length){content.innerHTML='<span style="color:var(--muted);font-size:.82rem">No skills on final demon yet.</span>';return;}
-  content.innerHTML=skills.map(s=>`<div class="summary-skill ${s.type}"><span style="flex:1;font-weight:600">${s.name}</span><span style="font-size:.72rem;color:var(--muted)">${s.note}</span>${s.type==='probable'?'<div class="prob-bar"><div class="prob-fill" style="width:75%"></div></div>':''}</div>`).join('');
-}
-
-function exportChain(){
-  if(!selectedDemon){toast('No chain to export');return;}
-  const data={source:chain[0].demonName,steps:chain.slice(1).map((s,i)=>({step:i+1,demon:s.demonName,inherited:s.inheritedSkills})),generatedAt:new Date().toISOString()};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`fusion-chain-${chain[0].demonName.replace(/\s+/g,'-')}.json`;a.click();
-  toast('Exported!','success');
-}
+function removeChainStep(idx){ appState.chain.splice(idx,1); renderChain(); }
+function clearChain(){ appState.chain=[]; renderChain(); }
 function copyChain(){
-  if(!selectedDemon){toast('No chain');return;}
-  let t=`Fusion Chain — ${chain[0].demonName}\n${'─'.repeat(38)}\n`;
-  chain.forEach((step,i)=>{
-    const d=DEMONS[step.demonName];
-    t+=`\n${i===0?'Source':'Step '+i}: ${step.demonName} (Lv${d?.lvl} ${d?.race})\n`;
-    const i2=inn(d||{skills:{}});
-    if(i2.length)t+=`  Innate: ${i2.join(', ')}\n`;
-    if(step.inheritedSkills.length)t+=`  Inherited: ${step.inheritedSkills.join(', ')}\n`;
-  });
-  navigator.clipboard.writeText(t).then(()=>toast('Copied!','success')).catch(()=>toast('Copy failed'));
+  if(!appState.chain.length){ toast('Chain is empty'); return; }
+  const text = appState.chain.map((s,i)=>`Step ${i+1}: ${s.parentA} × ${s.parentB} → ${s.result}\n  Skills: ${s.previewSkills.join(', ')||'None'}`).join('\n\n');
+  navigator.clipboard.writeText(text).then(()=>toast('Chain copied')).catch(()=>toast('Copy failed'));
 }
-
-function toast(msg,type=''){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.className='toast'+(type?' '+type:'');
-  t.classList.add('show');clearTimeout(t._t);
-  t._t=setTimeout(()=>t.classList.remove('show'),2400);
+function openSkillModal(name){
+  appState.editingDemon=name;
+  document.getElementById('skillModalTitle').textContent=`Edit owned skills — ${name}`;
+  document.getElementById('skillSearch').value='';
+  renderSkillModal();
+  document.getElementById('skillModal').classList.add('open');
 }
-
-document.getElementById('skillModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+function closeSkillModal(){ document.getElementById('skillModal').classList.remove('open'); }
+function renderSkillModal(){
+  const name=appState.editingDemon; if(!name) return;
+  const q=(document.getElementById('skillSearch').value||'').toLowerCase();
+  const owned=ensureOwnedState(name);
+  const current=currentSkills(name);
+  const base=[...new Set([...baseActiveSkills(name),...baseLearnedSkills(name)])];
+  const pool=ALL_SKILLS.filter(s=>s.toLowerCase().includes(q));
+  const cmdCurrent=current.filter(isCmd).slice(0,3);
+  const pasCurrent=current.filter(s=>!isCmd(s)).slice(0,3);
+  document.getElementById('skillModalContent').innerHTML = `
+    <div class="skill-columns">
+      <div class="skill-box">
+        <div class="skill-head cmd">Current command slots</div>
+        <div class="skill-list">${[0,1,2].map(i=>editableSlot(name, cmdCurrent[i], 'cmd', i)).join('')}</div>
+      </div>
+      <div class="skill-box">
+        <div class="skill-head pas">Current passive slots</div>
+        <div class="skill-list">${[0,1,2].map(i=>editableSlot(name, pasCurrent[i], 'pas', i)).join('')}</div>
+      </div>
+    </div>
+    <div class="help">Base/default skills for this demon: ${base.join(', ')||'None'}.</div>
+    <div class="skill-columns">
+      <div class="skill-box">
+        <div class="skill-head cmd">Available command skills</div>
+        <div class="skill-list">${pool.filter(isCmd).map(s=>pickRow(name,s,current.includes(s))).join('')}</div>
+      </div>
+      <div class="skill-box">
+        <div class="skill-head pas">Available passive skills</div>
+        <div class="skill-list">${pool.filter(s=>!isCmd(s)).map(s=>pickRow(name,s,current.includes(s))).join('')}</div>
+      </div>
+    </div>`;
+}
+function editableSlot(name, skill, type, index){
+  return `<div class="skill-slot owned-edit" onclick="removeSkillFromOwned('${esc(name)}','${type}',${index})"><div class="skill-left"><span class="skill-type-pill ${type}">${type.toUpperCase()}</span><span>${skill||'Empty slot'}</span></div><span class="skill-note">${skill?'click to clear':'—'}</span></div>`;
+}
+function pickRow(name, skill, active){
+  return `<div class="skill-pick" onclick="toggleOwnedSkill('${esc(name)}','${esc(skill)}')"><div class="skill-left"><span class="skill-type-pill ${isCmd(skill)?'cmd':'pas'}">${isCmd(skill)?'CMD':'PAS'}</span><span>${skill}</span></div><span class="skill-note">${active?'Selected':'Add'}</span></div>`;
+}
+function normalizeOwnedSkills(name){
+  const st=ensureOwnedState(name);
+  const cmd=st.currentSkills.filter(isCmd).slice(0,3);
+  const pas=st.currentSkills.filter(s=>!isCmd(s)).slice(0,3);
+  st.currentSkills=[...cmd,...pas];
+}
+function toggleOwnedSkill(name, skill){
+  const st=ensureOwnedState(name);
+  const exists=st.currentSkills.includes(skill);
+  if(exists){ st.currentSkills=st.currentSkills.filter(s=>s!==skill); }
+  else {
+    if(isCmd(skill)){
+      const cmd=st.currentSkills.filter(isCmd);
+      if(cmd.length>=3){ toast('Only 3 command slots shown in this build'); return; }
+    } else {
+      const pas=st.currentSkills.filter(s=>!isCmd(s));
+      if(pas.length>=3){ toast('Only 3 passive slots shown in this build'); return; }
+    }
+    st.currentSkills.push(skill);
+  }
+  normalizeOwnedSkills(name);
+  renderSkillModal();renderWorkbench();renderChain();
+}
+function removeSkillFromOwned(name,type,index){
+  const st=ensureOwnedState(name);
+  const arr=st.currentSkills.filter(s=>type==='cmd'?isCmd(s):!isCmd(s));
+  if(!arr[index]) return;
+  st.currentSkills=st.currentSkills.filter(s=>s!==arr[index]);
+  normalizeOwnedSkills(name);
+  renderSkillModal();renderWorkbench();renderChain();
+}
+function esc(s){ return s.replace(/'/g,"\\'"); }
+document.getElementById('skillModal').addEventListener('click', e=>{ if(e.target.id==='skillModal') closeSkillModal(); });
 init();
 </script>
 </body>
