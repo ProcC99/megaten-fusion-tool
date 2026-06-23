@@ -4,10 +4,8 @@ import { isAHExclusiveSkill, decodeAHSkillTier, PlayerState } from './fusion-tre
 import { SMT_NORMAL_FUSION_CALCULATOR } from '../../compendium/constants';
 
 export interface FusionRecipe {
-  name1: string;
-  skills1: string[];
-  name2: string;
-  skills2: string[];
+  state1: DPState;
+  state2: DPState;
 }
 
 export interface OwnedDemon {
@@ -313,8 +311,8 @@ export class FusionDPSolver {
               ownedCount: current.ownedCount + bState.ownedCount,
               ownedMask: current.ownedMask | bState.ownedMask,
               recipe: {
-                name1: current.demon, skills1: current.skills,
-                name2: bState.demon,  skills2: bState.skills
+                state1: current,
+                state2: bState
               }
             };
             
@@ -333,8 +331,7 @@ export class FusionDPSolver {
     const steps: any[] = [];
     let nodeIdCount = 0;
 
-    const traverse = (stateKey: string): string => {
-      const state = bestMap.get(stateKey)!;
+    const traverse = (state: DPState): string => {
       const nodeId = `N${nodeIdCount++}`;
       
       const node: FusionGraphNode = {
@@ -349,12 +346,12 @@ export class FusionDPSolver {
       graph.push(node);
 
       if (state.recipe) {
-        const id1 = traverse(this.getKey(state.recipe.name1, state.recipe.skills1));
-        const id2 = traverse(this.getKey(state.recipe.name2, state.recipe.skills2));
+        const id1 = traverse(state.recipe.state1);
+        const id2 = traverse(state.recipe.state2);
         node.recipe = { ingredient1Id: id1, ingredient2Id: id2 };
         
-        const d1 = bestMap.get(this.getKey(state.recipe.name1, state.recipe.skills1))!;
-        const d2 = bestMap.get(this.getKey(state.recipe.name2, state.recipe.skills2))!;
+        const d1 = state.recipe.state1;
+        const d2 = state.recipe.state2;
         
         steps.push({
           fuse1: `${d1.demon} [${d1.skills.join(', ')}]`,
@@ -367,7 +364,7 @@ export class FusionDPSolver {
       return nodeId;
     };
 
-    traverse(finalKey);
+    traverse(finalState);
 
     return {
       success: true,
