@@ -197,6 +197,7 @@ export class FusionDPSolver {
     // Empty state for all demons
     for (const demon of this.comp.allDemons) {
       const dName = demon.name;
+      if (dName === targetDemon) continue;
       pushState({ demon: dName, skills: [], maxLevel: this.getDemonLevel(dName), cost: 0, ahCount: 0, maccaCost: this.getDemonPrice(dName), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
     }
 
@@ -204,6 +205,7 @@ export class FusionDPSolver {
     for (const sk of skillList) {
       const holders = this.getNaturalHolders(sk);
       for (const h of holders) {
+        if (h.name === targetDemon) continue;
         const ahc = isAH(this.comp.getSkill(sk).level) ? 1 : 0;
         pushState({ demon: h.name, skills: [sk], maxLevel: h.reqLevel, cost: 0, ahCount: ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
         
@@ -219,14 +221,21 @@ export class FusionDPSolver {
     // Custom Owned Demons
     if (!ignoreOwned) {
       for (let i = 0; i < ownedDemons.length; i++) {
-        const owned = ownedDemons[i];
-        const relevantSkills = owned.skills.filter(s => skillList.includes(s));
+        const od = ownedDemons[i];
+        if (od.name === targetDemon) continue;
+        const matchingSkills = od.skills.filter(s => skillList.includes(s));
+        
+        let initialAhCount = 0;
+        for (const s of matchingSkills) {
+          if (isAH(this.comp.getSkill(s).level)) initialAhCount++;
+        }
+
         pushState({
-          demon: owned.name,
-          skills: relevantSkills,
-          maxLevel: this.getDemonLevel(owned.name),
+          demon: od.name,
+          skills: matchingSkills,
+          maxLevel: this.getDemonLevel(od.name),
           cost: 0,
-          ahCount: 0,
+          ahCount: initialAhCount,
           maccaCost: 0,
           summonCount: 0,
           ownedCount: 1,
