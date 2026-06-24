@@ -777,7 +777,7 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     this.searchFailed = false;
     this.isTierZeroMode = false;
 
-    if (reqSkills.length === 0) {
+    if (reqSkills.length === 0 && !this.ownedDemonUIs.some(u => u.isStatsTransfer)) {
       this.isSearching = false;
       this.isTierZeroMode = true;
       this.fissionPage = 0;
