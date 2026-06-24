@@ -10,6 +10,7 @@ import { combineLatest, Subscription } from 'rxjs';
 import { FUSION_DATA_SERVICE } from '../../compendium/constants';
 import { FusionDataService } from '../../smt4f/fusion-data.service';
 import { Compendium } from '../../smt4f/models/compendium';
+import { CurrentDemonService } from '../../compendium/current-demon.service';
 
 import { FusionDPSolver, DPFusionResult, FusionGraphNode, OwnedDemon } from '../models/fusion-dp-solver';
 import { DemonProfileBuilder, DemonProfile } from '../models/demon-profile-builder';
@@ -18,8 +19,9 @@ import COMP_CONFIG_JSON from '../data/comp-config.json';
 
 export interface OwnedDemonUI {
   profile: DemonProfile;
-  freeCmdSlots: (string | null)[];
+  cmdSlots: (string | null)[];
   freePasSlots: (string | null)[];
+  isStatsTransfer: boolean;
   isCollapsed?: boolean;
 }
 
@@ -31,7 +33,7 @@ export interface OwnedDemonUI {
   <h2 class="section-title">Devil Survivor Skill Recipe</h2>
 
   <!-- 1. Target demon selection -->
-  <section class="panel target-panel" *ngIf="!targetDemonObj">
+  <section class="panel target-panel" *ngIf="!targetDemonObj && breadcrumbs.length === 0">
     <h3>Select Target Demon</h3>
     <input type="text" placeholder="Search demon…" [(ngModel)]="demonSearchQuery"
       (input)="onDemonSearch()" class="demon-search-input" />
@@ -144,36 +146,48 @@ export interface OwnedDemonUI {
              <span style="display: inline-block; width: 20px; font-size: 0.9rem;">{{ od.isCollapsed ? '▶' : '▼' }}</span>
              {{ od.profile.name }} 
              <span style="font-size: 0.8rem; color: #aaa; margin-left: 6px;">(Lv {{ od.profile.lvl }} {{ od.profile.race }})</span>
+             <span *ngIf="od.isStatsTransfer" style="font-size: 0.7rem; color: #fff; background: #e67e22; padding: 2px 6px; border-radius: 12px; margin-left: 8px; font-weight: normal;">Stats Transfer</span>
              <span *ngIf="od.isCollapsed" style="font-size: 0.8rem; color: #aaa; margin-left: 10px;">
-               [{{ getFilledSlotCount(od.freeCmdSlots) + od.profile.innateCmd.length }} Cmd, {{ getFilledSlotCount(od.freePasSlots) + od.profile.innatePas.length }} Pas]
+               [{{ getFilledSlotCount(od.cmdSlots) }} Cmd, {{ getFilledSlotCount(od.freePasSlots) + od.profile.innatePas.length }} Pas]
              </span>
            </span>
-           <button class="btn-remove-demon" (click)="removeOwnedDemon(odIdx); $event.stopPropagation()">✕ Remove</button>
+           <div style="display: flex; align-items: center; gap: 12px;">
+             <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #ccc; cursor: pointer;" (click)="$event.stopPropagation()">
+               <input type="checkbox" [checked]="od.isStatsTransfer" (change)="toggleStatsTransfer(odIdx)" style="cursor: pointer;">
+               Mark for Stats Transfer
+             </label>
+             <button class="btn-remove-demon" (click)="removeOwnedDemon(odIdx); $event.stopPropagation()">✕ Remove</button>
+           </div>
          </div>
 
          <div class="slots-container" style="margin-top: 0;" *ngIf="!od.isCollapsed">
             <!-- Command Skills -->
             <div class="slot-column">
-              <h4>Command Skills ({{ getFilledSlotCount(od.freeCmdSlots) + od.profile.innateCmd.length }}/3)</h4>
-              <div class="slot innate-slot" *ngFor="let sk of od.profile.innateCmd">
-                <span class="slot-icon">🗡</span> {{ sk.name }} <span *ngIf="sk.lvl >= 1" style="color: #888; font-size: 0.8em; margin-left: 4px;">(Lv {{ sk.lvl }})</span> <span class="badge badge-innate">INNATE</span>
-              </div>
-              <div class="slot free-slot" *ngFor="let sk of od.freeCmdSlots; let i = index" 
+              <h4>Command Skills ({{ getFilledSlotCount(od.cmdSlots) }}/3)</h4>
+              <div class="slot free-slot" *ngFor="let sk of od.cmdSlots; let i = index" 
                    (click)="openSkillPicker('cmd', i, odIdx)"
                    [class.is-filled]="sk !== null"
                    [class.is-active]="activePickerType === 'cmd' && activePickerIndex === i && activeOwnedDemonIndex === odIdx">
                 <span class="slot-icon">🗡</span>
-                <span class="slot-text">{{ sk ? sk : '[ Click to set Command Skill ]' }}</span>
-                <button class="btn-clear-slot" *ngIf="sk" (click)="clearSlot('cmd', i, $event, odIdx)">✕</button>
+                <span class="slot-text">
+                  {{ sk ? sk : '[ Click to set Command Skill ]' }}
+                  <span *ngIf="isSkillInnate(od.profile, sk, 'cmd')" class="badge badge-innate" style="margin-left: 4px;">INNATE</span>
+                </span>
+                <button class="btn-clear-slot" *ngIf="sk && !isSkillInnate(od.profile, sk, 'cmd')" (click)="clearSlot('cmd', i, $event, odIdx)">✕</button>
+                <button class="btn-clear-slot" *ngIf="sk && isSkillInnate(od.profile, sk, 'cmd')" title="Remove Innate Skill" (click)="clearSlot('cmd', i, $event, odIdx)">✕</button>
               </div>
             </div>
       
             <!-- Passive Skills -->
             <div class="slot-column">
               <h4>Passive Skills ({{ getFilledSlotCount(od.freePasSlots) + od.profile.innatePas.length }}/3)</h4>
+              
+              <!-- Innate Passive Skills -->
               <div class="slot innate-slot" *ngFor="let sk of od.profile.innatePas">
                 <span class="slot-icon">🛡</span> {{ sk.name }} <span *ngIf="sk.lvl >= 1" style="color: #888; font-size: 0.8em; margin-left: 4px;">(Lv {{ sk.lvl }})</span> <span class="badge badge-innate">INNATE</span>
               </div>
+
+              <!-- Free Passive Slots -->
               <div class="slot free-slot" *ngFor="let sk of od.freePasSlots; let i = index" 
                    (click)="openSkillPicker('pas', i, odIdx)"
                    [class.is-filled]="sk !== null"
@@ -213,18 +227,52 @@ export interface OwnedDemonUI {
     </div>
   </section>
 
+  <div class="breadcrumbs-container" *ngIf="breadcrumbs.length > 0" style="margin-bottom: 16px; padding: 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+    <button class="breadcrumb-btn" style="background: none; border: none; color: #4aa1f3; cursor: pointer; padding: 0; font-size: 0.95rem; font-weight: bold; text-decoration: underline;" (click)="restoreBreadcrumb(0)">Main Target</button>
+    <ng-container *ngFor="let crumb of breadcrumbs.slice(1); let i = index">
+      <span style="color: #666; font-size: 0.9rem;">&gt;</span>
+      <button class="breadcrumb-btn" style="background: none; border: none; color: #4aa1f3; cursor: pointer; padding: 0; font-size: 0.95rem; font-weight: bold; text-decoration: underline;" (click)="restoreBreadcrumb(i + 1)">{{ crumb.targetDemonName }}</button>
+    </ng-container>
+    <span style="color: #666; font-size: 0.9rem;">&gt;</span>
+    <span style="color: #ccc; font-size: 0.95rem; font-weight: bold;">{{ targetDemonObj?.name }}</span>
+  </div>
+
   <!-- Results -->
   <section class="panel results-panel" *ngIf="dpResults.length > 0">
-    <h3>Optimal Fusion Recipes</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="margin: 0;">
+        <ng-container *ngIf="!isTierZeroMode">Optimal Fusion Recipes</ng-container>
+        <ng-container *ngIf="isTierZeroMode">Immediate Parent Fusions ({{ dpResults.length }} total)</ng-container>
+      </h3>
+      
+      <div *ngIf="isTierZeroMode" class="tier-zero-controls" style="display: flex; align-items: center; gap: 12px;">
+        <label style="color: #ccc; font-size: 0.9rem;">
+          Sort By:
+          <select [(ngModel)]="tierZeroSort" (change)="onTierZeroSortChange()" style="background: #222; color: #eee; border: 1px solid #555; padding: 4px; border-radius: 4px; margin-left: 4px;">
+            <option value="level">Lowest Level</option>
+            <option value="macca">Lowest Macca</option>
+          </select>
+        </label>
+        
+        <div class="pagination-controls" style="display: flex; align-items: center; gap: 8px;">
+          <button (click)="prevFissionPage()" [disabled]="fissionPage === 0" style="background: #333; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; padding: 4px 8px;">◀</button>
+          <span style="color: #ccc; font-size: 0.9rem;">Page {{ fissionPage + 1 }} of {{ totalFissionPages }}</span>
+          <button (click)="nextFissionPage()" [disabled]="fissionPage >= totalFissionPages - 1" style="background: #333; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; padding: 4px 8px;">▶</button>
+        </div>
+      </div>
+    </div>
     
-    <div class="path-tabs">
+    <div class="path-tabs" [class.paginated-tabs]="isTierZeroMode" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
       <button class="path-tab" 
-              *ngFor="let res of dpResults; let i = index" 
+              *ngFor="let res of getPaginatedResults(); let i = index" 
               [class.active]="selectedResultIndex === i"
-              (click)="selectedResultIndex = i">
+              (click)="selectedResultIndex = i"
+              [style.flex]="isTierZeroMode ? '1 1 calc(20% - 6px)' : '1 1 auto'"
+              [style.min-width]="isTierZeroMode ? '140px' : 'auto'">
         <div class="tab-title">{{ res.label }}</div>
-        <div class="tab-stats">Lv {{ res.maxLevel }} | {{ res.totalFusions }} Steps | {{ res.ahCount }} AH</div>
-        <div class="tab-stats" style="margin-top: 2px;">{{ res.summonCount }} Summons | {{ res.maccaCost | number }} Macca</div>
+        <div class="tab-stats" *ngIf="!isTierZeroMode">Lv {{ res.maxLevel }} | {{ res.totalFusions }} Steps | {{ res.ahCount }} AH</div>
+        <div class="tab-stats" *ngIf="isTierZeroMode">Lv {{ res.maxLevel }} | {{ res.maccaCost | number }} Macca</div>
+        <div class="tab-stats" style="margin-top: 2px;" *ngIf="!isTierZeroMode">{{ res.summonCount }} Summons | {{ res.maccaCost | number }} Macca</div>
       </button>
     </div>
 
@@ -232,11 +280,12 @@ export interface OwnedDemonUI {
       <ng-template #fusionNode let-node="node">
         <div class="tree-node" [class.is-natural]="node.isNatural">
           <div class="node-info">
-            <span class="step-badge" *ngIf="node.stepNumber">{{ node === dpResults[selectedResultIndex].graph[0] ? 'Final Result' : 'Step ' + node.stepNumber }}</span>
+            <span class="step-badge" *ngIf="node.stepNumber">{{ node === getPaginatedResults()[selectedResultIndex].graph[0] ? 'Final Result' : 'Step ' + node.stepNumber }}</span>
             <span class="node-demon">{{ node.demon }}</span>
-            <span class="node-skills" *ngIf="node.skills.length">
-              [<ng-container *ngFor="let sk of node.skills; let last = last">
-                {{ sk }}<span *ngIf="getSkillLevelReq(node.demon, sk) as reqLv" class="skill-req" style="color: #888; font-size: 0.9em; margin-left: 2px;"> (Lv {{reqLv}})</span><span *ngIf="!last">, </span>
+            <button class="btn-generate-tree" *ngIf="node !== getPaginatedResults()[selectedResultIndex].graph[0]" (click)="generateForDemon(node.demon)" title="Generate Fusion Tree for {{ node.demon }}" style="background: none; border: none; cursor: pointer; font-size: 1.1rem; margin-left: 4px;">🌳</button>
+            <span class="node-skills" *ngIf="getDisplaySkills(node).length">
+              [<ng-container *ngFor="let sk of getDisplaySkills(node); let last = last">
+                {{ sk }}<span *ngIf="getSkillLevelReq(node.demon, sk) as reqLv" class="skill-req" style="color: #888; font-size: 0.9em; margin-left: 2px;">(Lv {{reqLv}})</span><span *ngIf="!last">, </span>
               </ng-container>]
             </span>
             <span class="node-label" *ngIf="node.isNatural && !node.isOwned" style="color: #777; font-size: 0.8rem; margin-left: 8px;">(Summon)</span>
@@ -250,8 +299,8 @@ export interface OwnedDemonUI {
       </ng-template>
 
       <!-- Start rendering from root node -->
-      <div class="tree-root">
-        <ng-container *ngTemplateOutlet="fusionNode; context: { node: dpResults[selectedResultIndex].graph[0] }"></ng-container>
+      <div class="tree-root" *ngIf="getPaginatedResults().length > 0">
+        <ng-container *ngTemplateOutlet="fusionNode; context: { node: getPaginatedResults()[selectedResultIndex].graph[0] }"></ng-container>
       </div>
     </div>
   </section>
@@ -386,6 +435,11 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   dpResults: DPFusionResult[] = [];
   selectedResultIndex: number = 0;
   
+  fissionPage: number = 0;
+  fissionPageSize: number = 10;
+  isTierZeroMode: boolean = false;
+  tierZeroSort: 'level' | 'macca' = 'level';
+  
   isSearching: boolean = false;
   searchFailed: boolean = false;
 
@@ -396,10 +450,14 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   ownedDemonSearchQuery: string = '';
   ownedDemonSuggestions: string[] = [];
   activeOwnedDemonIndex: number | null = null;
+  
+  // Breadcrumb State
+  breadcrumbs: { targetDemonName: string, freeCmdSlots: (string | null)[], freePasSlots: (string | null)[] }[] = [];
 
   constructor(
     private route: ActivatedRoute,
     @Inject(FUSION_DATA_SERVICE) private fusionDataService: FusionDataService,
+    private currentDemonService: CurrentDemonService,
     private cdr: ChangeDetectorRef
   ) {
     this.compendium = this.fusionDataService.compConfig as any;
@@ -438,6 +496,7 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   }
 
   clearTargetDemon() {
+    this.breadcrumbs = [];
     this.targetDemonObj = null;
     this.dpResults = [];
     this.selectedResultIndex = 0;
@@ -495,7 +554,7 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     if (ownedDemonIdx !== undefined) {
       if (type === 'cmd') {
-        this.ownedDemonUIs[ownedDemonIdx].freeCmdSlots[index] = null;
+        this.ownedDemonUIs[ownedDemonIdx].cmdSlots[index] = null;
       } else {
         this.ownedDemonUIs[ownedDemonIdx].freePasSlots[index] = null;
       }
@@ -537,17 +596,17 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
 
       if (this.activeOwnedDemonIndex !== null) {
         const odUI = this.ownedDemonUIs[this.activeOwnedDemonIndex];
-        checkInnateCmd = odUI.profile.innateCmd;
-        checkInnatePas = odUI.profile.innatePas;
-        checkFreeCmd = odUI.freeCmdSlots;
+        checkInnateCmd = []; // We allow overwriting innate skills, so we don't prevent picking them if they were cleared
+        checkInnatePas = odUI.profile.innatePas; 
+        checkFreeCmd = odUI.cmdSlots;
         checkFreePas = odUI.freePasSlots;
       }
 
-      // Ensure it's not already innate
+      // Ensure it's not already innate (only for target demon)
       if (this.activePickerType === 'cmd' && checkInnateCmd.some(sk => sk.name === skName)) return false;
       if (this.activePickerType === 'pas' && checkInnatePas.some(sk => sk.name === skName)) return false;
 
-      // Ensure it's not already in another free slot
+      // Ensure it's not already in another free slot (or set slot for owned demons)
       if (this.activePickerType === 'cmd' && checkFreeCmd.includes(skName)) return false;
       if (this.activePickerType === 'pas' && checkFreePas.includes(skName)) return false;
 
@@ -562,7 +621,7 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   selectSkill(skillName: string) {
     if (this.activeOwnedDemonIndex !== null) {
       if (this.activePickerType === 'cmd') {
-        this.ownedDemonUIs[this.activeOwnedDemonIndex].freeCmdSlots[this.activePickerIndex] = skillName;
+        this.ownedDemonUIs[this.activeOwnedDemonIndex].cmdSlots[this.activePickerIndex] = skillName;
       } else if (this.activePickerType === 'pas') {
         this.ownedDemonUIs[this.activeOwnedDemonIndex].freePasSlots[this.activePickerIndex] = skillName;
       }
@@ -592,10 +651,16 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     const builder = new DemonProfileBuilder(this.compendium);
     const profile = builder.buildProfile(name);
     if (profile) {
+      const cmdSlots: (string | null)[] = [null, null, null];
+      for (let i = 0; i < profile.innateCmd.length && i < 3; i++) cmdSlots[i] = profile.innateCmd[i].name;
+
+      const freePasSlots: (string | null)[] = Array(profile.freePasCount).fill(null);
+
       this.ownedDemonUIs.push({
-        profile,
-        freeCmdSlots: Array(profile.freeCmdCount).fill(null),
-        freePasSlots: Array(profile.freePasCount).fill(null)
+        profile: profile,
+        cmdSlots: cmdSlots,
+        freePasSlots: freePasSlots,
+        isStatsTransfer: false
       });
     }
     this.ownedDemonSearchQuery = '';
@@ -606,9 +671,20 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     this.ownedDemonUIs.splice(index, 1);
   }
 
+  toggleStatsTransfer(index: number) {
+    this.ownedDemonUIs[index].isStatsTransfer = !this.ownedDemonUIs[index].isStatsTransfer;
+  }
+
   // -------------------------------------
   // DP Generator
   // -------------------------------------
+  isSkillInnate(profile: DemonProfile, skillName: string | null, type: 'cmd' | 'pas'): boolean {
+    if (!skillName) return false;
+    if (type === 'cmd') return profile.innateCmd.some(sk => sk.name === skillName);
+    if (type === 'pas') return profile.innatePas.some(sk => sk.name === skillName);
+    return false;
+  }
+
   isSkillAvailableNaturally(skName: string): boolean {
     for (const d of this.compendium.allDemons) {
       for (const [s, lvl] of Object.entries(d.skills)) {
@@ -616,6 +692,44 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
       }
     }
     return false;
+  }
+
+  // --- Pagination Helpers ---
+  getPaginatedResults(): DPFusionResult[] {
+    if (!this.isTierZeroMode) return this.dpResults;
+    const start = this.fissionPage * this.fissionPageSize;
+    return this.dpResults.slice(start, start + this.fissionPageSize);
+  }
+  
+  get totalFissionPages(): number {
+    return Math.ceil(this.dpResults.length / this.fissionPageSize);
+  }
+  
+  nextFissionPage() {
+    if (this.fissionPage < this.totalFissionPages - 1) {
+      this.fissionPage++;
+      this.selectedResultIndex = 0;
+    }
+  }
+  
+  prevFissionPage() {
+    if (this.fissionPage > 0) {
+      this.fissionPage--;
+      this.selectedResultIndex = 0;
+    }
+  }
+  
+  onTierZeroSortChange() {
+    if (!this.isTierZeroMode) return;
+    this.dpResults.sort((a: any, b: any) => {
+      if (this.tierZeroSort === 'level') {
+        return a._avgLevel - b._avgLevel || a.maccaCost - b.maccaCost;
+      } else {
+        return a.maccaCost - b.maccaCost || a._avgLevel - b._avgLevel;
+      }
+    });
+    this.fissionPage = 0;
+    this.selectedResultIndex = 0;
   }
 
   getRequiredSkills(): string[] {
@@ -627,6 +741,31 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
 
   searchProgress: string = '';
 
+  generateForDemon(demon: string) {
+    this.breadcrumbs.push({
+      targetDemonName: this.targetDemonObj!.name,
+      freeCmdSlots: [...this.freeCmdSlots],
+      freePasSlots: [...this.freePasSlots]
+    });
+    this.selectTargetDemon(demon);
+    this.freeCmdSlots = this.freeCmdSlots.map(() => null);
+    this.freePasSlots = this.freePasSlots.map(() => null);
+    // Let change detection run so the UI updates and then trigger generate
+    setTimeout(() => this.generate(), 50);
+  }
+
+  restoreBreadcrumb(index: number) {
+    const crumb = this.breadcrumbs[index];
+    if (!crumb) return;
+    
+    this.breadcrumbs = this.breadcrumbs.slice(0, index);
+    this.selectTargetDemon(crumb.targetDemonName);
+    this.freeCmdSlots = [...crumb.freeCmdSlots];
+    this.freePasSlots = [...crumb.freePasSlots];
+    
+    setTimeout(() => this.generate(), 50);
+  }
+
   async generate() {
     const reqSkills = this.getRequiredSkills();
     if (!this.targetDemonObj) return;
@@ -636,6 +775,92 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     this.dpResults = [];
     this.selectedResultIndex = 0;
     this.searchFailed = false;
+    this.isTierZeroMode = false;
+
+    if (reqSkills.length === 0) {
+      this.isSearching = false;
+      this.isTierZeroMode = true;
+      this.fissionPage = 0;
+      
+      const fusions = this.fusionDataService.fissionCalculator.getFusions(this.targetDemonObj.name, this.compendium, this.fusionChart);
+      
+      const pseudoResults: DPFusionResult[] = fusions.map((pair, index) => {
+        const d1 = this.compendium.getDemon(pair.name1);
+        const d2 = this.compendium.getDemon(pair.name2);
+        
+        let maccaCost = 0;
+        let d1Owned = false;
+        let d2Owned = false;
+        
+        if (this.ownedDemonUIs.find(u => u.profile.name === pair.name1)) {
+          d1Owned = true;
+        } else {
+          maccaCost += d1.price;
+        }
+        
+        if (this.ownedDemonUIs.find(u => u.profile.name === pair.name2)) {
+          d2Owned = true;
+        } else {
+          maccaCost += d2.price;
+        }
+        
+        const graph: FusionGraphNode[] = [
+          {
+            id: '0',
+            demon: this.targetDemonObj!.name,
+            recipe: { ingredient1Id: '1', ingredient2Id: '2' },
+            stepNumber: 0,
+            isNatural: true,
+            isOwned: false,
+            level: this.targetDemonObj!.lvl,
+            skills: []
+          },
+          {
+            id: '1',
+            demon: pair.name1,
+            recipe: null,
+            isNatural: true,
+            isOwned: d1Owned,
+            level: d1.lvl,
+            skills: []
+          },
+          {
+            id: '2',
+            demon: pair.name2,
+            recipe: null,
+            isNatural: true,
+            isOwned: d2Owned,
+            level: d2.lvl,
+            skills: []
+          }
+        ];
+        
+        const avgLevel = (d1.lvl + d2.lvl) / 2;
+        
+        return {
+          label: `${pair.name1} x ${pair.name2}`,
+          graph,
+          maxLevel: Math.max(d1.lvl, d2.lvl),
+          maccaCost,
+          totalFusions: 1,
+          ahCount: 0,
+          summonCount: (d1Owned ? 0 : 1) + (d2Owned ? 0 : 1),
+          _avgLevel: avgLevel // internal use for sorting
+        } as any;
+      });
+      
+      pseudoResults.sort((a: any, b: any) => {
+        if (this.tierZeroSort === 'level') {
+          return a._avgLevel - b._avgLevel || a.maccaCost - b.maccaCost;
+        } else {
+          return a.maccaCost - b.maccaCost || a._avgLevel - b._avgLevel;
+        }
+      });
+      
+      this.dpResults = pseudoResults;
+      this.cdr.markForCheck();
+      return;
+    }
 
     try {
       console.log("Starting solveMultiSkillFusion for:", this.targetDemonObj.name, "with skills:", reqSkills, "maxLevel:", this.playerMaxLevel);
@@ -645,20 +870,20 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
 
       const ownedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
         const skills = [
-          ...ui.profile.innateCmd.map(sk => sk.name),
-          ...ui.profile.innatePas.map(sk => sk.name),
           ui.profile.innateRac,
-          ...ui.freeCmdSlots.filter(s => s !== null) as string[],
+          ...ui.profile.innatePas.map(s => s.name),
+          ...ui.cmdSlots.filter(s => s !== null) as string[],
           ...ui.freePasSlots.filter(s => s !== null) as string[]
         ];
         return {
           name: ui.profile.name,
           lvl: ui.profile.lvl,
-          skills: skills
+          skills: skills,
+          isStatsTransfer: ui.isStatsTransfer
         };
       });
 
-      const runSolver = async (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned', labelName: string, ignoreOwned: boolean = false) => {
+      const runSolver = async (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned' | 'stats_transfer', labelName: string, ignoreOwned: boolean = false) => {
         const solver = new FusionDPSolver(this.compendium, this.fusionChart);
         const activeOwnedDemons = ignoreOwned ? [] : ownedDemons;
         const res = await solver.solveMultiSkillFusion(
@@ -684,6 +909,7 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
       if (ownedDemons.length > 0) {
         await runSolver('max_owned', 'Most Owned Used');
         await runSolver('min_fusions', 'Fewest Steps (No Owned)', true);
+        await runSolver('stats_transfer', 'Stats Transfer');
       }
 
       this.dpResults = results;
@@ -702,8 +928,9 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     }
   }
 
-  getNode(id: string): FusionGraphNode | undefined {
-    return this.dpResults[this.selectedResultIndex]?.graph.find(n => n.id === id);
+  getNode(id: string | number): FusionGraphNode | undefined {
+    return this.getPaginatedResults()[this.selectedResultIndex]?.graph.find(n => n.demon === id || (n as any).id === id) || 
+           this.getPaginatedResults()[this.selectedResultIndex]?.graph[id as number];
   }
 
   getSkillAcquisition(demonName: string, skillName: string): string {
@@ -730,5 +957,14 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
       return slvl;
     }
     return null;
+  }
+
+  getDisplaySkills(node: any): string[] {
+    if (this.getRequiredSkills().length > 0) {
+      return node.skills;
+    }
+    const dObj = this.compendium.getDemon(node.demon);
+    if (!dObj) return [];
+    return Object.keys(dObj.skills).filter(k => dObj.skills[k] === 0);
   }
 }

@@ -11,6 +11,7 @@ export interface FusionRecipe {
 export interface OwnedDemon {
   name: string;
   skills: string[];
+  isStatsTransfer?: boolean;
 }
 
 export interface DPState {
@@ -23,6 +24,8 @@ export interface DPState {
   summonCount: number;
   ownedCount: number;
   ownedMask: number;
+  statsTransferCount: number;
+  statsTransferDepth: number;
   isOwned?: boolean;
   recipe: FusionRecipe | null;
 }
@@ -118,9 +121,13 @@ export class FusionDPSolver {
     return sub.every(s => sup.includes(s));
   }
 
-  private getKey(demon: string, skills: string[]): string {
+  private getKey(demon: string, skills: string[], hasStatsTransfer?: boolean): string {
     const sortedSkills = [...skills].sort();
-    return `${demon}|${sortedSkills.join(',')}`;
+    let key = `${demon}|${sortedSkills.join(',')}`;
+    if (hasStatsTransfer !== undefined) {
+      key += hasStatsTransfer ? '|ST' : '|NO_ST';
+    }
+    return key;
   }
 
   private getMissingSkills(currentSkills: string[], requiredSkills: string[]): string[] {
@@ -146,7 +153,7 @@ export class FusionDPSolver {
     targetDemon: string,
     requiredSkills: string[],
     maxPlayerLevel: number = 99,
-    criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned' = 'min_level',
+    criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned' | 'stats_transfer' = 'min_level',
     ownedDemons: OwnedDemon[] = [],
     ignoreOwned: boolean = false,
     onProgress?: (iterations: number, pqLength: number) => void
@@ -155,7 +162,16 @@ export class FusionDPSolver {
     const pq: DPState[] = [];
     
     const compareBadness = (a: DPState, b: DPState) => {
-      if (criteria === 'min_level') {
+      if (criteria === 'stats_transfer') {
+        if (a.cost !== b.cost) return a.cost - b.cost;
+        if (a.statsTransferCount !== b.statsTransferCount) {
+          return b.statsTransferCount - a.statsTransferCount; // Prefer MORE stats transfer demons
+        }
+        if (a.statsTransferDepth !== b.statsTransferDepth) {
+          return a.statsTransferDepth - b.statsTransferDepth; // Minimize depth (closer to final fusion)
+        }
+        return (a.maccaCost - b.maccaCost) || (a.maxLevel - b.maxLevel);
+      } else if (criteria === 'min_level') {
         return (a.maxLevel - b.maxLevel) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost);
       } else if (criteria === 'min_fusions') {
         return (a.cost - b.cost) || (a.maccaCost - b.maccaCost) || (a.maxLevel - b.maxLevel);
@@ -169,7 +185,7 @@ export class FusionDPSolver {
 
     const pushState = (state: DPState) => {
       if (state.maxLevel > maxPlayerLevel) return;
-      const key = this.getKey(state.demon, state.skills);
+      const key = this.getKey(state.demon, state.skills, criteria === 'stats_transfer' ? state.statsTransferCount > 0 : undefined);
       const existing = bestMap.get(key);
       if (existing) {
         if (compareBadness(state, existing) >= 0) return;
@@ -194,11 +210,23 @@ export class FusionDPSolver {
     // 1. Initialize Base States
     const skillList = [...requiredSkills].sort();
     
-    // Empty state for all demons
+    // Find lowest level demon for each race to act as the absolute base tier
+    const lowestLevelByRace = new Map<string, string>();
+    for (const demon of this.comp.allDemons) {
+      // Exclude special fusions from being considered the "lowest rank base" of a race 
+      // since they cannot be used as generic ingredients easily or bought.
+      if (demon.fusion === 'special') continue;
+      const currentLowest = lowestLevelByRace.get(demon.race);
+      if (!currentLowest || demon.lvl < this.comp.getDemon(currentLowest).lvl) {
+        lowestLevelByRace.set(demon.race, demon.name);
+      }
+    }
+
     for (const demon of this.comp.allDemons) {
       const dName = demon.name;
       if (dName === targetDemon) continue;
-      pushState({ demon: dName, skills: [], maxLevel: this.getDemonLevel(dName), cost: 0, ahCount: 0, maccaCost: this.getDemonPrice(dName), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
+      
+      pushState({ demon: dName, skills: [], maxLevel: this.getDemonLevel(dName), cost: 0, ahCount: 0, maccaCost: this.getDemonPrice(dName), summonCount: 1, ownedCount: 0, ownedMask: 0, statsTransferCount: 0, statsTransferDepth: 0, recipe: null });
     }
 
     // Natural holders for each required skill
@@ -207,13 +235,13 @@ export class FusionDPSolver {
       for (const h of holders) {
         if (h.name === targetDemon) continue;
         const ahc = isAH(this.comp.getSkill(sk).level) ? 1 : 0;
-        pushState({ demon: h.name, skills: [sk], maxLevel: h.reqLevel, cost: 0, ahCount: ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
+        pushState({ demon: h.name, skills: [sk], maxLevel: h.reqLevel, cost: 0, ahCount: ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, ownedCount: 0, ownedMask: 0, statsTransferCount: 0, statsTransferDepth: 0, recipe: null });
         
         // Also add combined state if a demon naturally holds multiple required skills
         const multiSkills = skillList.filter(s => h.name === this.getNaturalHolders(s).find(x => x.name === h.name)?.name);
         if (multiSkills.length > 1) {
           const m_ahc = multiSkills.filter(s => isAH(this.comp.getSkill(s).level)).length;
-          pushState({ demon: h.name, skills: multiSkills, maxLevel: h.reqLevel, cost: 0, ahCount: m_ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, ownedCount: 0, ownedMask: 0, recipe: null });
+          pushState({ demon: h.name, skills: multiSkills, maxLevel: h.reqLevel, cost: 0, ahCount: m_ahc, maccaCost: this.getDemonPrice(h.name), summonCount: 1, ownedCount: 0, ownedMask: 0, statsTransferCount: 0, statsTransferDepth: 0, recipe: null });
         }
       }
     }
@@ -223,23 +251,22 @@ export class FusionDPSolver {
       for (let i = 0; i < ownedDemons.length; i++) {
         const od = ownedDemons[i];
         if (od.name === targetDemon) continue;
-        const matchingSkills = od.skills.filter(s => skillList.includes(s));
         
-        let initialAhCount = 0;
-        for (const s of matchingSkills) {
-          if (isAH(this.comp.getSkill(s).level)) initialAhCount++;
-        }
-
+        const mask = 1 << i;
+        const requiredOwnedSkills = od.skills.filter(s => skillList.includes(s));
+        
         pushState({
           demon: od.name,
-          skills: matchingSkills,
+          skills: requiredOwnedSkills,
           maxLevel: this.getDemonLevel(od.name),
           cost: 0,
-          ahCount: initialAhCount,
+          ahCount: requiredOwnedSkills.filter(s => isAH(this.comp.getSkill(s).level)).length,
           maccaCost: 0,
           summonCount: 0,
           ownedCount: 1,
-          ownedMask: 1 << i,
+          ownedMask: mask,
+          statsTransferCount: od.isStatsTransfer ? 1 : 0,
+          statsTransferDepth: od.isStatsTransfer ? 1 : 0, // Depth starts at 1 for the base demon itself
           isOwned: true,
           recipe: null
         });
@@ -247,17 +274,20 @@ export class FusionDPSolver {
     }
 
     let iterations = 0;
+    let lastYield = performance.now();
     while (pq.length > 0 && iterations < 100000) {
       iterations++;
       
       if (iterations % 500 === 0) {
-        if (onProgress) onProgress(iterations, pq.length);
-        await new Promise(r => setTimeout(r, 0));
+        if (performance.now() - lastYield > 16) {
+          if (onProgress) onProgress(iterations, pq.length);
+          await new Promise(r => setTimeout(r, 0));
+          lastYield = performance.now();
+        }
       }
 
       const current = pq.pop()!;
-      
-      const currentKey = this.getKey(current.demon, current.skills);
+      const currentKey = this.getKey(current.demon, current.skills, criteria === 'stats_transfer' ? current.statsTransferCount > 0 : undefined);
       
       // Strict prune based on criteria
       const bestCurrent = bestMap.get(currentKey)!;
@@ -268,7 +298,10 @@ export class FusionDPSolver {
       
       if (current.demon === targetDemon && this.isSubset(requiredSkills, current.skills)) {
         if (current.cost > 0) {
-          return this.buildResult(currentKey, bestMap);
+          if (criteria === 'stats_transfer' && current.statsTransferCount === 0) {
+            continue; // Keep searching for an ST=1 path
+          }
+          return this.buildResult(current);
         }
       }
 
@@ -287,10 +320,18 @@ export class FusionDPSolver {
 
         const subsets = this.getAllSubsets(requiredSkills);
         for (const subB of subsets) {
-          const bKey = this.getKey(ingredientB, subB);
-          const bState = bestMap.get(bKey);
+          const bStates: DPState[] = [];
+          if (criteria === 'stats_transfer') {
+            const bKeyST = this.getKey(ingredientB, subB, true);
+            const bKeyNoST = this.getKey(ingredientB, subB, false);
+            if (bestMap.has(bKeyST)) bStates.push(bestMap.get(bKeyST)!);
+            if (bestMap.has(bKeyNoST)) bStates.push(bestMap.get(bKeyNoST)!);
+          } else {
+            const bKey = this.getKey(ingredientB, subB);
+            if (bestMap.has(bKey)) bStates.push(bestMap.get(bKey)!);
+          }
           
-          if (bState) {
+          for (const bState of bStates) {
             if (current.ownedMask !== 0 && bState.ownedMask !== 0 && (current.ownedMask & bState.ownedMask) !== 0) continue;
             const mergedSkills = Array.from(new Set([...current.skills, ...bState.skills])).sort();
             // Validate slot limit constraint
@@ -339,6 +380,8 @@ export class FusionDPSolver {
               summonCount: newSummonCount,
               ownedCount: current.ownedCount + bState.ownedCount,
               ownedMask: current.ownedMask | bState.ownedMask,
+              statsTransferCount: current.statsTransferCount + bState.statsTransferCount,
+              statsTransferDepth: (current.statsTransferCount > 0 || bState.statsTransferCount > 0) ? Math.max(current.statsTransferDepth, bState.statsTransferDepth) + 1 : 0,
               recipe: {
                 state1: current,
                 state2: bState
@@ -351,11 +394,30 @@ export class FusionDPSolver {
       }
     }
 
+    let bestFinalState: DPState | null = null;
+    if (criteria === 'stats_transfer') {
+      const finalKeyST = this.getKey(targetDemon, skillList, true);
+      const finalKeyNoST = this.getKey(targetDemon, skillList, false);
+      const st1 = bestMap.get(finalKeyST);
+      const st0 = bestMap.get(finalKeyNoST);
+      if (st1) {
+        bestFinalState = st1;
+      } else if (st0) {
+        bestFinalState = st0;
+      }
+    } else {
+      const finalKey = this.getKey(targetDemon, skillList);
+      bestFinalState = bestMap.get(finalKey) || null;
+    }
+    
+    if (bestFinalState) {
+      return this.buildResult(bestFinalState);
+    }
+
     return null;
   }
 
-  private buildResult(finalKey: string, bestMap: Map<string, DPState>): DPFusionResult {
-    const finalState = bestMap.get(finalKey)!;
+  private buildResult(finalState: DPState): DPFusionResult {
     const graph: FusionGraphNode[] = [];
     const steps: any[] = [];
     let nodeIdCount = 0;
@@ -402,7 +464,7 @@ export class FusionDPSolver {
       ahCount: finalState.ahCount,
       maccaCost: finalState.maccaCost,
       summonCount: finalState.summonCount,
-      finalKey,
+      finalKey: '',
       graph,
       steps
     };
