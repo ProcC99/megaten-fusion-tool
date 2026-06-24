@@ -258,7 +258,9 @@ export class FusionDPSolver {
       if (criteria === 'max_owned' && bestCurrent.ownedCount > current.ownedCount) continue;
       
       if (current.demon === targetDemon && this.isSubset(requiredSkills, current.skills)) {
-        return this.buildResult(currentKey, bestMap);
+        if (current.cost > 0) {
+          return this.buildResult(currentKey, bestMap);
+        }
       }
 
       const forwardFusions = SMT_NORMAL_FUSION_CALCULATOR.getFusions(current.demon, this.comp as any, this.chart as any);
