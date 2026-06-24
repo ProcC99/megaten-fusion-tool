@@ -208,7 +208,7 @@ export interface OwnedDemonUI {
     <div class="settings-row">
       <input type="number" [(ngModel)]="playerMaxLevel" min="1" max="99" class="setting-input" />
       <button class="btn-generate" (click)="generate()" [disabled]="!targetDemonObj || isSearching">
-        {{ isSearching ? 'Computing...' : 'Generate DP Recipe' }}
+        {{ isSearching ? 'Computing...' + (searchProgress ? ' ' + searchProgress : '') : 'Generate DP Recipe' }}
       </button>
     </div>
   </section>
@@ -618,71 +618,81 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     return skills;
   }
 
-  generate() {
+  searchProgress: string = '';
+
+  async generate() {
     const reqSkills = this.getRequiredSkills();
     if (!this.targetDemonObj) return;
 
     this.isSearching = true;
+    this.searchProgress = '';
     this.dpResults = [];
     this.selectedResultIndex = 0;
     this.searchFailed = false;
 
-    // Use setTimeout to allow UI to render the "Computing..." state
-    setTimeout(() => {
-      try {
-        console.log("Starting solveMultiSkillFusion for:", this.targetDemonObj.name, "with skills:", reqSkills, "maxLevel:", this.playerMaxLevel);
-        const startTime = performance.now();
-        
-        const results: DPFusionResult[] = [];
-        
-        const ownedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
-          const skills = [
-            ...ui.profile.innateCmd.map(sk => sk.name),
-            ...ui.profile.innatePas.map(sk => sk.name),
-            ui.profile.innateRac,
-            ...ui.freeCmdSlots.filter(s => s !== null) as string[],
-            ...ui.freePasSlots.filter(s => s !== null) as string[]
-          ];
-          return {
-            name: ui.profile.name,
-            lvl: ui.profile.lvl,
-            skills: skills
-          };
-        });
+    try {
+      console.log("Starting solveMultiSkillFusion for:", this.targetDemonObj.name, "with skills:", reqSkills, "maxLevel:", this.playerMaxLevel);
+      const startTime = performance.now();
 
-        const runSolver = (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned', labelName: string, ignoreOwned: boolean = false) => {
-          const solver = new FusionDPSolver(this.compendium, this.fusionChart);
-          const activeOwnedDemons = ignoreOwned ? [] : ownedDemons;
-          const res = solver.solveMultiSkillFusion(this.targetDemonObj.name, reqSkills, this.playerMaxLevel, criteria, activeOwnedDemons);
-          if (res) {
-            res.label = labelName;
-            results.push(res);
-          }
+      const results: DPFusionResult[] = [];
+
+      const ownedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
+        const skills = [
+          ...ui.profile.innateCmd.map(sk => sk.name),
+          ...ui.profile.innatePas.map(sk => sk.name),
+          ui.profile.innateRac,
+          ...ui.freeCmdSlots.filter(s => s !== null) as string[],
+          ...ui.freePasSlots.filter(s => s !== null) as string[]
+        ];
+        return {
+          name: ui.profile.name,
+          lvl: ui.profile.lvl,
+          skills: skills
         };
+      });
 
-        runSolver('min_level', 'Lowest Level');
-        runSolver('min_level', 'Lowest Level (No Owned)', true);
-        runSolver('min_fusions', 'Fewest Fusions');
-        runSolver('min_ah', 'Fewest AH');
-        runSolver('max_owned', 'Max Owned');
-        
-        const endTime = performance.now();
-        console.log(`solveMultiSkillFusion (all passes) completed in ${(endTime - startTime).toFixed(2)}ms`);
-        
-        if (results.length > 0) {
-          this.dpResults = results;
-        } else {
-          console.warn("solveMultiSkillFusion returned null for all passes");
-          this.searchFailed = true;
+      const runSolver = async (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned', labelName: string, ignoreOwned: boolean = false) => {
+        const solver = new FusionDPSolver(this.compendium, this.fusionChart);
+        const activeOwnedDemons = ignoreOwned ? [] : ownedDemons;
+        const res = await solver.solveMultiSkillFusion(
+          this.targetDemonObj.name, 
+          reqSkills, 
+          this.playerMaxLevel, 
+          criteria, 
+          activeOwnedDemons, 
+          ignoreOwned,
+          (iter, qLen) => {
+            this.searchProgress = `(${iter} iters, ${qLen} paths)`;
+            if (this.cdr) this.cdr.detectChanges();
+          }
+        );
+        if (res) {
+          res.label = labelName;
+          results.push(res);
         }
-      } catch (e) {
-        console.error("solveMultiSkillFusion threw an error:", e);
-        this.searchFailed = true;
-      } finally {
-        this.isSearching = false;
-        this.cdr.markForCheck();
+      };
+
+      await runSolver('min_level', 'Lowest Level');
+      await runSolver('min_fusions', 'Fewest Steps');
+      if (ownedDemons.length > 0) {
+        await runSolver('max_owned', 'Most Owned Used');
+        await runSolver('min_fusions', 'Fewest Steps (No Owned)', true);
       }
-    }, 50);
+
+      this.dpResults = results;
+      if (this.dpResults.length === 0) {
+        this.searchFailed = true;
+      }
+      console.log(`Fusion search completed in ${(performance.now() - startTime).toFixed(2)}ms`);
+
+    } catch (e) {
+      console.error("Fusion Solver Error:", e);
+      this.searchFailed = true;
+    } finally {
+      this.isSearching = false;
+      this.searchProgress = '';
+      if (this.cdr) this.cdr.detectChanges();
+    }
   }
 
   getNode(id: string): FusionGraphNode | undefined {

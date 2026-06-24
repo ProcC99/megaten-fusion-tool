@@ -142,38 +142,51 @@ export class FusionDPSolver {
     return subsets;
   }
 
-  public solveMultiSkillFusion(
-    targetDemon: string, 
-    requiredSkills: string[], 
+  public async solveMultiSkillFusion(
+    targetDemon: string,
+    requiredSkills: string[],
     maxPlayerLevel: number = 99,
     criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned' = 'min_level',
     ownedDemons: OwnedDemon[] = [],
-    ignoreOwned: boolean = false
-  ): DPFusionResult | null {
+    ignoreOwned: boolean = false,
+    onProgress?: (iterations: number, pqLength: number) => void
+  ): Promise<DPFusionResult | null> {
     const bestMap = new Map<string, DPState>();
     const pq: DPState[] = [];
     
+    const compareBadness = (a: DPState, b: DPState) => {
+      if (criteria === 'min_level') {
+        return (a.maxLevel - b.maxLevel) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost);
+      } else if (criteria === 'min_fusions') {
+        return (a.cost - b.cost) || (a.maccaCost - b.maccaCost) || (a.maxLevel - b.maxLevel);
+      } else if (criteria === 'min_ah') {
+        return (a.ahCount - b.ahCount) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost);
+      } else if (criteria === 'max_owned') {
+        return (b.ownedCount - a.ownedCount) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost);
+      }
+      return 0;
+    };
+
     const pushState = (state: DPState) => {
       if (state.maxLevel > maxPlayerLevel) return;
       const key = this.getKey(state.demon, state.skills);
       const existing = bestMap.get(key);
       if (existing) {
-        if (criteria === 'min_level') {
-          if (existing.maxLevel < state.maxLevel) return;
-          if (existing.maxLevel === state.maxLevel && existing.maccaCost <= state.maccaCost) return;
-        } else if (criteria === 'min_fusions') {
-          if (existing.cost < state.cost) return;
-          if (existing.cost === state.cost && existing.maccaCost <= state.maccaCost) return;
-        } else if (criteria === 'min_ah') {
-          if (existing.ahCount < state.ahCount) return;
-          if (existing.ahCount === state.ahCount && existing.maccaCost <= state.maccaCost) return;
-        } else if (criteria === 'max_owned') {
-          if (existing.ownedCount > state.ownedCount) return;
-          if (existing.ownedCount === state.ownedCount && existing.maccaCost <= state.maccaCost) return;
-        }
+        if (compareBadness(state, existing) >= 0) return;
       }
       bestMap.set(key, state);
-      pq.push(state);
+      
+      let low = 0;
+      let high = pq.length;
+      while (low < high) {
+        let mid = (low + high) >>> 1;
+        if (compareBadness(state, pq[mid]) > 0) {
+          high = mid;
+        } else {
+          low = mid + 1;
+        }
+      }
+      pq.splice(low, 0, state);
     };
 
     const isAH = (slvl: number) => isAHExclusiveSkill(slvl);
@@ -224,26 +237,16 @@ export class FusionDPSolver {
       }
     }
 
-    const sortPQ = () => {
-      if (criteria === 'min_level') {
-        pq.sort((a, b) => (a.maxLevel - b.maxLevel) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost));
-      } else if (criteria === 'min_fusions') {
-        pq.sort((a, b) => (a.cost - b.cost) || (a.maccaCost - b.maccaCost) || (a.maxLevel - b.maxLevel));
-      } else if (criteria === 'min_ah') {
-        pq.sort((a, b) => (a.ahCount - b.ahCount) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost));
-      } else if (criteria === 'max_owned') {
-        pq.sort((a, b) => (b.ownedCount - a.ownedCount) || (a.maccaCost - b.maccaCost) || (a.cost - b.cost));
-      }
-    };
-
-    sortPQ();
-
     let iterations = 0;
     while (pq.length > 0 && iterations < 100000) {
       iterations++;
       
-      sortPQ();
-      const current = pq.shift()!;
+      if (iterations % 500 === 0) {
+        if (onProgress) onProgress(iterations, pq.length);
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      const current = pq.pop()!;
       
       const currentKey = this.getKey(current.demon, current.skills);
       
@@ -283,10 +286,24 @@ export class FusionDPSolver {
             let cmdCount = 0;
             let pasCount = 0;
             let valid = true;
+
+            for (const skName of Object.keys(resDemonObj.skills)) {
+              const skLevel = resDemonObj.skills[skName];
+              if (isAHExclusiveSkill(skLevel)) continue;
+              const skObj = this.comp.getSkill(skName);
+              if (!skObj) continue;
+              if (skObj.element === 'aut' || skObj.element === 'auto' || skObj.element === 'rac') continue;
+              if (skObj.element === 'pas') pasCount++;
+              else cmdCount++;
+            }
+
             for (const sk of mergedSkills) {
               const skObj = this.comp.getSkill(sk);
               if (!skObj || skObj.element === 'aut' || skObj.element === 'auto' || skObj.element === 'rac') {
                 valid = false; break;
+              }
+              if (resDemonObj.skills.hasOwnProperty(sk) && !isAHExclusiveSkill(resDemonObj.skills[sk])) {
+                continue; 
               }
               if (skObj.element === 'pas') pasCount++;
               else cmdCount++;
