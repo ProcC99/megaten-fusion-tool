@@ -4,7 +4,7 @@
  * Target-first fusion recipe generator with DP algorithm and Visual Profile
  */
 
-import { Component, OnInit, OnDestroy, Inject, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { combineLatest, Subscription } from 'rxjs';
 import { FUSION_DATA_SERVICE } from '../../compendium/constants';
@@ -124,7 +124,7 @@ export interface OwnedDemonUI {
           <h5>Select {{ activePickerType === 'cmd' ? 'Command' : 'Passive' }} Skill</h5>
           <button class="btn-close-picker" (click)="closeSkillPicker()">✕</button>
         </div>
-        <input type="text" placeholder="Search skill..." [(ngModel)]="skillSearchQuery" (input)="onSkillSearch()" class="skill-picker-input" autofocus />
+        <input #skillInput type="text" placeholder="Search skill..." [(ngModel)]="skillSearchQuery" (input)="onSkillSearch()" class="skill-picker-input" autofocus />
         <ul class="picker-suggestions">
           <li *ngFor="let s of skillSuggestions" (click)="selectSkill(s)" class="picker-item">{{ s }}</li>
         </ul>
@@ -357,6 +357,7 @@ export interface OwnedDemonUI {
   `]
 })
 export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
+  @ViewChild('skillInput') skillInput?: ElementRef<HTMLInputElement>;
   compendium: Compendium;
   sub: Subscription;
   resistHeaders: string[] = COMP_CONFIG_JSON.resistElems;
@@ -476,6 +477,12 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
     this.activeOwnedDemonIndex = ownedDemonIdx ?? null;
     this.skillSearchQuery = '';
     this.updateSkillSuggestions();
+    
+    setTimeout(() => {
+      if (this.skillInput) {
+        this.skillInput.nativeElement.focus();
+      }
+    });
   }
 
   closeSkillPicker() {
