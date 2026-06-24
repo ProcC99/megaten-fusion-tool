@@ -6,8 +6,8 @@ export interface DemonProfile {
   race: string;
   lvl: number;
   stats: number[];
-  innateCmd: string[];
-  innatePas: string[];
+  innateCmd: { name: string, lvl: number }[];
+  innatePas: { name: string, lvl: number }[];
   innateRac: string;
   freeCmdCount: number;
   freePasCount: number;
@@ -20,8 +20,8 @@ export class DemonProfileBuilder {
     const demonObj = this.compendium.getDemon(demonName);
     if (!demonObj) return null;
 
-    const innateCmd: string[] = [];
-    const innatePas: string[] = [];
+    const innateCmd: { name: string, lvl: number }[] = [];
+    const innatePas: { name: string, lvl: number }[] = [];
     let innateRac = '';
 
     const skills = demonObj.skills;
@@ -42,9 +42,9 @@ export class DemonProfileBuilder {
       if (skObj.element === 'rac') {
         innateRac = skName;
       } else if (skObj.element === 'pas') {
-        innatePas.push(skName);
+        innatePas.push({ name: skName, lvl: skLevel });
       } else {
-        innateCmd.push(skName);
+        innateCmd.push({ name: skName, lvl: skLevel });
       }
     }
 

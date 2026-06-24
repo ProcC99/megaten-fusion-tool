@@ -74,7 +74,7 @@ export interface OwnedDemonUI {
         
         <!-- Innate Command Skills -->
         <div class="slot innate-slot" *ngFor="let sk of innateCmd">
-          <span class="slot-icon">🗡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+          <span class="slot-icon">🗡</span> {{ sk.name }} <span *ngIf="sk.lvl >= 1" style="color: #888; font-size: 0.8em; margin-left: 4px;">(Lv {{ sk.lvl }})</span> <span class="badge badge-innate">INNATE</span>
         </div>
 
         <!-- Free Command Slots -->
@@ -94,7 +94,7 @@ export interface OwnedDemonUI {
         
         <!-- Innate Passive Skills -->
         <div class="slot innate-slot" *ngFor="let sk of innatePas">
-          <span class="slot-icon">🛡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+          <span class="slot-icon">🛡</span> {{ sk.name }} <span *ngIf="sk.lvl >= 1" style="color: #888; font-size: 0.8em; margin-left: 4px;">(Lv {{ sk.lvl }})</span> <span class="badge badge-innate">INNATE</span>
         </div>
 
         <!-- Free Passive Slots -->
@@ -117,16 +117,18 @@ export interface OwnedDemonUI {
       </div>
     </div>
 
-    <!-- Contextual Skill Picker -->
-    <div class="skill-picker" *ngIf="activePickerType">
-      <div class="picker-header">
-        <h5>Select {{ activePickerType === 'cmd' ? 'Command' : 'Passive' }} Skill</h5>
-        <button class="btn-close-picker" (click)="closeSkillPicker()">✕</button>
+    <!-- Contextual Skill Picker Modal -->
+    <div class="modal-backdrop" *ngIf="activePickerType" (click)="closeSkillPicker()">
+      <div class="skill-picker" (click)="$event.stopPropagation()">
+        <div class="picker-header">
+          <h5>Select {{ activePickerType === 'cmd' ? 'Command' : 'Passive' }} Skill</h5>
+          <button class="btn-close-picker" (click)="closeSkillPicker()">✕</button>
+        </div>
+        <input type="text" placeholder="Search skill..." [(ngModel)]="skillSearchQuery" (input)="onSkillSearch()" class="skill-picker-input" autofocus />
+        <ul class="picker-suggestions">
+          <li *ngFor="let s of skillSuggestions" (click)="selectSkill(s)" class="picker-item">{{ s }}</li>
+        </ul>
       </div>
-      <input type="text" placeholder="Search skill..." [(ngModel)]="skillSearchQuery" (input)="onSkillSearch()" class="skill-picker-input" autofocus />
-      <ul class="picker-suggestions">
-        <li *ngFor="let s of skillSuggestions" (click)="selectSkill(s)" class="picker-item">{{ s }}</li>
-      </ul>
     </div>
   </section>
 
@@ -154,7 +156,7 @@ export interface OwnedDemonUI {
             <div class="slot-column">
               <h4>Command Skills ({{ getFilledSlotCount(od.freeCmdSlots) + od.profile.innateCmd.length }}/3)</h4>
               <div class="slot innate-slot" *ngFor="let sk of od.profile.innateCmd">
-                <span class="slot-icon">🗡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+                <span class="slot-icon">🗡</span> {{ sk.name }} <span *ngIf="sk.lvl >= 1" style="color: #888; font-size: 0.8em; margin-left: 4px;">(Lv {{ sk.lvl }})</span> <span class="badge badge-innate">INNATE</span>
               </div>
               <div class="slot free-slot" *ngFor="let sk of od.freeCmdSlots; let i = index" 
                    (click)="openSkillPicker('cmd', i, odIdx)"
@@ -170,7 +172,7 @@ export interface OwnedDemonUI {
             <div class="slot-column">
               <h4>Passive Skills ({{ getFilledSlotCount(od.freePasSlots) + od.profile.innatePas.length }}/3)</h4>
               <div class="slot innate-slot" *ngFor="let sk of od.profile.innatePas">
-                <span class="slot-icon">🛡</span> {{ sk }} <span class="badge badge-innate">INNATE</span>
+                <span class="slot-icon">🛡</span> {{ sk.name }} <span *ngIf="sk.lvl >= 1" style="color: #888; font-size: 0.8em; margin-left: 4px;">(Lv {{ sk.lvl }})</span> <span class="badge badge-innate">INNATE</span>
               </div>
               <div class="slot free-slot" *ngFor="let sk of od.freePasSlots; let i = index" 
                    (click)="openSkillPicker('pas', i, odIdx)"
@@ -234,7 +236,7 @@ export interface OwnedDemonUI {
             <span class="node-demon">{{ node.demon }}</span>
             <span class="node-skills" *ngIf="node.skills.length">
               [<ng-container *ngFor="let sk of node.skills; let last = last">
-                {{ sk }}<span *ngIf="node.isNatural && !node.isOwned" class="skill-req"> ({{ getSkillAcquisition(node.demon, sk) }})</span><span *ngIf="!last">, </span>
+                {{ sk }}<span *ngIf="getSkillLevelReq(node.demon, sk) as reqLv" class="skill-req" style="color: #888; font-size: 0.9em; margin-left: 2px;"> (Lv {{reqLv}})</span><span *ngIf="!last">, </span>
               </ng-container>]
             </span>
             <span class="node-label" *ngIf="node.isNatural && !node.isOwned" style="color: #777; font-size: 0.8rem; margin-left: 8px;">(Summon)</span>
@@ -272,7 +274,7 @@ export interface OwnedDemonUI {
     .demon-search-input { width: 100%; max-width: 300px; }
     .setting-input { width: 80px; text-align: center; }
     
-    .demon-suggestions, .picker-suggestions { list-style: none; margin: 4px 0 0; padding: 0; background: #222; border: 1px solid #555; border-radius: 4px; max-height: 200px; overflow-y: auto; position: absolute; z-index: 10; width: 100%; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .demon-suggestions { list-style: none; margin: 4px 0 0; padding: 0; background: #222; border: 1px solid #555; border-radius: 4px; max-height: 200px; overflow-y: auto; position: absolute; z-index: 10; width: 100%; max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
     .suggestion-item, .picker-item { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #333; }
     .suggestion-item:hover, .picker-item:hover { background: #3a5c20; }
     
@@ -305,12 +307,15 @@ export interface OwnedDemonUI {
     .btn-clear-slot { position: absolute; right: 8px; background: transparent; border: none; color: #c55; cursor: pointer; font-size: 1rem; padding: 4px; }
     .btn-clear-slot:hover { color: #f55; }
     
-    .skill-picker { background: #1a1a2e; border: 1px solid #7dff7d; border-radius: 6px; padding: 16px; margin-top: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.8); }
+    /* Modal Backdrop */
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+    
+    .skill-picker { background: #1a1a2e; border: 1px solid #7dff7d; border-radius: 6px; padding: 16px; margin-top: 0; box-shadow: 0 4px 16px rgba(0,0,0,0.8); width: 100%; max-width: 400px; max-height: 90vh; display: flex; flex-direction: column; }
     .picker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
     .picker-header h5 { margin: 0; color: #7dff7d; font-size: 1rem; }
     .btn-close-picker { background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 1.2rem; }
-    .skill-picker-input { width: 100%; margin-bottom: 12px; }
-    .picker-suggestions { position: static; width: 100%; max-height: 250px; }
+    .skill-picker-input { width: 100%; margin-bottom: 12px; flex-shrink: 0; }
+    .picker-suggestions { width: 100%; overflow-y: auto; flex-grow: 1; list-style: none; margin: 0; padding: 0; background: #222; border-radius: 4px; border: 1px solid #555; }
     
     .settings-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
     .btn-generate { padding: 8px 16px; background: #c34242; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; flex: 1; min-width: 180px; }
@@ -360,12 +365,11 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
   demonSearchQuery = '';
   demonSuggestions: string[] = [];
   
-  // Profile State
-  targetDemonObj: any = null;
-  innateCmd: string[] = [];
-  innatePas: string[] = [];
+  // Target Demon Profile State
+  targetDemonObj: any | null = null;
+  innateCmd: { name: string, lvl: number }[] = [];
+  innatePas: { name: string, lvl: number }[] = [];
   innateRac: string = '';
-  
   freeCmdSlots: (string | null)[] = [];
   freePasSlots: (string | null)[] = [];
   
@@ -533,8 +537,8 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
       }
 
       // Ensure it's not already innate
-      if (this.activePickerType === 'cmd' && checkInnateCmd.includes(skName)) return false;
-      if (this.activePickerType === 'pas' && checkInnatePas.includes(skName)) return false;
+      if (this.activePickerType === 'cmd' && checkInnateCmd.some(sk => sk.name === skName)) return false;
+      if (this.activePickerType === 'pas' && checkInnatePas.some(sk => sk.name === skName)) return false;
 
       // Ensure it's not already in another free slot
       if (this.activePickerType === 'cmd' && checkFreeCmd.includes(skName)) return false;
@@ -633,12 +637,17 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
         
         const ownedDemons: OwnedDemon[] = this.ownedDemonUIs.map(ui => {
           const skills = [
-            ...ui.profile.innateCmd,
-            ...ui.profile.innatePas,
-            ...(ui.freeCmdSlots.filter(s => s !== null) as string[]),
-            ...(ui.freePasSlots.filter(s => s !== null) as string[])
+            ...ui.profile.innateCmd.map(sk => sk.name),
+            ...ui.profile.innatePas.map(sk => sk.name),
+            ui.profile.innateRac,
+            ...ui.freeCmdSlots.filter(s => s !== null) as string[],
+            ...ui.freePasSlots.filter(s => s !== null) as string[]
           ];
-          return { name: ui.profile.name, skills };
+          return {
+            name: ui.profile.name,
+            lvl: ui.profile.lvl,
+            skills: skills
+          };
         });
 
         const runSolver = (criteria: 'min_level' | 'min_fusions' | 'min_ah' | 'max_owned', labelName: string, ignoreOwned: boolean = false) => {
@@ -694,5 +703,15 @@ export class SkillFusionGeneratorComponent implements OnInit, OnDestroy {
       return `${tier.charAt(0).toUpperCase() + tier.slice(1)} AH`;
     }
     return '';
+  }
+
+  getSkillLevelReq(demonName: string, skillName: string): number | null {
+    const demonObj = this.compendium.getDemon(demonName);
+    if (!demonObj) return null;
+    const slvl = demonObj.skills[skillName];
+    if (slvl !== undefined && slvl >= 1 && slvl <= 99) {
+      return slvl;
+    }
+    return null;
   }
 }
