@@ -35,6 +35,6 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist/megaten-fusion-tool
-          publish_branch: pages
+          publish_branch: gh-pages
           force_orphan: false
           commit_message: 'deploy: ${{ github.sha }}'
