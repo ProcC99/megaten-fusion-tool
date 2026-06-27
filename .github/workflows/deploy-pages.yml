@@ -35,6 +35,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist/megaten-fusion-tool
-          publish_branch: gh-pages
+          publish_branch: pages
+          cname: desu.jpurple.online
           force_orphan: false
           commit_message: 'deploy: ${{ github.sha }}'
