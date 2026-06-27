@@ -30,6 +30,7 @@ export interface Demon {
   isEnemy?: boolean;
   align?: string;
   searchTags: string;
+  auctions?: { [skills: string]: number };
 }
 
 export interface Skill {

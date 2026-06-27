@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DS:Overclocked – Fusion Recipe Generator</title>
+<style>
+:root{
+  --bg:#0c0c0c;--panel:#151515;--panel2:#1b1b1b;--border:#2b2b2b;--text:#e5e5e5;--muted:#8b8b8b;
+  --accent:#c8a035;--accent2:#4c8fd8;--good:#4caf85;--bad:#e05a5a;--warn:#d6a33a;
+  --cmd:#7cc7ff;--pas:#9fd38d;--owned:#f4c84e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:Inter,'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh}
+h1{color:var(--accent);text-align:center;padding:16px 0 4px;font-size:1.3rem;letter-spacing:.04em}
+.subtitle{text-align:center;color:var(--muted);margin-bottom:12px;font-size:.82rem}
+.app{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 68px)}
+@media(max-width:960px){.app{grid-template-columns:1fr}}
+.sidebar{background:var(--panel);border-right:1px solid var(--border);padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.main{padding:14px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+
+/* controls */
+.field{display:flex;flex-direction:column;gap:5px}
+.label{font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+input[type=text],select{background:#1e1e1e;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;width:100%;font:inherit}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+button{cursor:pointer;font:inherit;border:none}
+.btn{padding:7px 14px;border-radius:5px;font-weight:700;font-size:.82rem}
+.btn-primary{background:var(--accent);color:#111}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:transparent;border:1px solid #e05a5a44;color:var(--bad)}
+.btn-danger:hover{background:#e05a5a14}
+.btn-sm{padding:3px 8px;font-size:.74rem}
+.row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.toggle-wrap{display:flex;align-items:center;gap:8px;padding:6px 0}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#333;border-radius:22px;transition:.2s;cursor:pointer}
+.slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+input:checked+.slider{background:var(--accent)}
+input:checked+.slider:before{transform:translateX(18px)}
+
+/* sidebar list */
+.sb-search{display:flex;flex-direction:column;gap:6px}
+.sb-tabs{display:flex;gap:4px}
+.sb-tab{flex:1;padding:5px 8px;border-radius:4px;border:1px solid var(--border);background:#1d1d1d;color:var(--muted);font-weight:700;font-size:.78rem}
+.sb-tab.active{border-color:var(--accent);color:var(--text);background:#201c10}
+.demon-list{display:flex;flex-direction:column;gap:4px;overflow:auto;flex:1;min-height:0}
+.demon-row{display:flex;align-items:center;gap:7px;padding:6px 7px;border:1px solid var(--border);border-radius:5px;background:#111;cursor:pointer;flex-shrink:0}
+.demon-row:hover{background:#181818}
+.star{color:#444;font-size:.95rem;cursor:pointer;flex-shrink:0;user-select:none;line-height:1}
+.star.on{color:var(--owned)}
+.d-meta{flex:1;min-width:0}
+.d-name{font-weight:700;font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.d-sub{font-size:.7rem;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:999px;border:1px solid var(--border);font-size:.68rem;color:var(--muted);background:#1c1c1c;white-space:nowrap}
+.badge.good{border-color:#1c402e;color:var(--good);background:#0b1f14}
+.badge.bad{border-color:#3e1c1c;color:var(--bad);background:#1f0b0b}
+.badge.warn{border-color:#3e3112;color:var(--warn);background:#1f180a}
+
+/* panel */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.panel-head{padding:10px 12px;background:var(--panel2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.panel-title{font-size:.88rem;font-weight:800;color:var(--accent)}
+.panel-body{padding:12px}
+.note{font-size:.76rem;color:var(--muted);padding:7px 9px;border:1px dashed var(--border);border-radius:5px;background:#0f0f0f}
+
+/* skill selector */
+.skill-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:700px){.skill-cols{grid-template-columns:1fr}}
+.skill-box{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#111}
+.skill-box-head{padding:7px 9px;font-size:.73rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+.skill-box-head.cmd{background:#0d1e2e;color:var(--cmd);border-bottom-color:#1b3347}
+.skill-box-head.pas{background:#111e11;color:var(--pas);border-bottom-color:#1e3120}
+.skill-pool{padding:6px;display:flex;flex-direction:column;gap:4px;max-height:240px;overflow:auto}
+.skill-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 7px;border:1px solid var(--border);border-radius:5px;background:#0f0f0f;cursor:pointer;font-size:.8rem}
+.skill-row:hover{background:#181818}
+.skill-row.selected{border-color:var(--accent);background:#1a1500}
+.skill-name{font-weight:600}
+.skill-source{font-size:.69rem;color:var(--muted)}
+.slot-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.slot-pill{padding:4px 9px;border-radius:999px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:#161616}
+.slot-pill.cmd{border-color:#1b3347;color:var(--cmd)}
+.slot-pill.pas{border-color:#1e3120;color:var(--pas)}
+.slot-pill:hover{filter:brightness(1.2)}
+
+/* result */
+.result-panel{border:1px solid var(--border);border-radius:7px;background:#0f0f0f;overflow:hidden}
+.result-head{padding:10px 12px;background:#191919;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.result-title{font-weight:800;font-size:.95rem;color:var(--good)}
+.result-body{padding:12px;display:flex;flex-direction:column;gap:10px}
+.failure-panel{border:1px solid #3e1c1c;border-radius:7px;background:#140a0a;padding:12px;display:flex;flex-direction:column;gap:6px}
+.failure-title{font-weight:800;color:var(--bad);font-size:.88rem}
+.failure-reasons{display:flex;flex-direction:column;gap:5px}
+.failure-reason{padding:6px 8px;border-left:3px solid var(--bad);background:#1a0c0c;border-radius:3px;font-size:.8rem}
+.chain-steps{display:flex;flex-direction:column;gap:8px}
+.step-card{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#111}
+.step-head{padding:8px 10px;background:#181818;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.step-head:hover{background:#1d1d1d}
+.step-main{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}
+.step-arrow{color:var(--accent);font-weight:900}
+.step-body{display:none;padding:10px;border-top:1px solid var(--border)}
+.step-body.open{display:block}
+
+/* demon card */
+.demon-card{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#111}
+.demon-card-head{padding:8px 10px;background:#191919;display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer}
+.demon-card-head:hover{background:#1e1e1e}
+.demon-card-body{display:none;padding:10px;border-top:1px solid var(--border)}
+.demon-card-body.open{display:block}
+.dc-title{font-weight:800;color:var(--accent);font-size:.88rem}
+.stats-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.stat-chip{min-width:36px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:#181818;text-align:center;font-size:.72rem}
+.stat-chip span{display:block;color:var(--muted);font-size:.63rem}
+.resists-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px}
+.res-chip{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:5px;border:1px solid var(--border);background:#161616;font-size:.74rem;gap:4px}
+.res-chip.weak{border-color:#5a2020;color:#ff8d8d;background:#1e0e0e}
+.res-chip.resist{border-color:#1a4030;color:#88ddb7;background:#0b1a14}
+.res-chip.special{border-color:#1a2e50;color:#8ec0ff;background:#0b141f}
+.res-chip.normal{color:var(--muted)}
+.skills-split{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:700px){.skills-split{grid-template-columns:1fr}}
+.sk-box{border:1px solid var(--border);border-radius:5px;overflow:hidden}
+.sk-head{padding:6px 8px;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.sk-head.cmd{background:#0d1e2e;color:var(--cmd);border-bottom:1px solid #1b3347}
+.sk-head.pas{background:#111e11;color:var(--pas);border-bottom:1px solid #1e3120}
+.sk-body{padding:6px;display:flex;flex-direction:column;gap:4px}
+.sk-slot{display:flex;align-items:center;gap:6px;padding:5px 7px;border:1px solid var(--border);border-radius:4px;background:#0f0f0f;font-size:.79rem}
+.sk-slot.empty{color:#555;border-style:dashed}
+.sk-pill{font-size:.6rem;padding:1px 5px;border-radius:999px;border:1px solid currentColor}
+.sk-pill.cmd{color:var(--cmd)}
+.sk-pill.pas{color:var(--pas)}
+.sk-pill.wanted{color:var(--accent);border-color:var(--accent)}
+.sk-right{font-size:.69rem;color:var(--muted);margin-left:auto}
+
+/* misc */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.empty{padding:20px;text-align:center;color:var(--muted);font-size:.84rem}
+.toast{position:fixed;right:16px;bottom:16px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:#202020;color:var(--text);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:200}
+.toast.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+<h1>⚔ DS:Overclocked – Fusion Recipe Generator</h1>
+<p class="subtitle">Select your target demon and desired skills → generate the fusion recipe that gets you there.</p>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-search">
+      <div class="sb-tabs">
+        <button class="sb-tab active" id="tabOwned" onclick="sbTab('owned')">Owned ★</button>
+        <button class="sb-tab" id="tabAll" onclick="sbTab('all')">All Demons</button>
+      </div>
+      <input id="sbSearch" type="text" placeholder="Search…" oninput="renderSidebar()"/>
+      <select id="sbRace" onchange="renderSidebar()"><option value="">All Races</option></select>
+    </div>
+    <div class="note">★ marks demons you own. Owned demons are preferred by the solver as material demons.</div>
+    <div id="demonList" class="demon-list"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TARGET SETUP -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">1 · Target Demon &amp; Desired Skills</div>
+          <div class="note" style="margin-top:4px;border:none;padding:0">Pick the demon you want to fuse toward, then choose up to 3 CMD and 3 PAS skills.</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="resetTarget()">Reset</button>
+      </div>
+      <div class="panel-body">
+        <div class="row" style="margin-bottom:12px">
+          <div class="field" style="flex:1">
+            <div class="label">Target demon</div>
+            <select id="targetSelect" onchange="onTargetChange()"><option value="">— Choose target —</option></select>
+          </div>
+          <div class="toggle-wrap">
+            <label class="toggle"><input type="checkbox" id="strictToggle"/><span class="slider"></span></label>
+            <span style="font-size:.8rem">Strict mode</span>
+          </div>
+        </div>
+        <div id="skillSelector" style="display:none">
+          <div class="skill-cols">
+            <div class="skill-box">
+              <div class="skill-box-head cmd">Command skills — <span id="cmdCount">0</span>/3 selected</div>
+              <div class="skill-pool" id="cmdPool"></div>
+            </div>
+            <div class="skill-box">
+              <div class="skill-box-head pas">Passive skills — <span id="pasCount">0</span>/3 selected</div>
+              <div class="skill-pool" id="pasPool"></div>
+            </div>
+          </div>
+          <div style="margin-top:8px">
+            <div class="label">Desired skills (click to remove)</div>
+            <div id="selectedSkills" class="slot-strip"></div>
+          </div>
+        </div>
+        <div id="targetCard" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <!-- GENERATE -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">2 · Generate Recipe</div>
+      </div>
+      <div class="panel-body">
+        <div class="row">
+          <button class="btn btn-primary" onclick="generateRecipe()">Generate Recipe</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyResult()">Copy Summary</button>
+        </div>
+        <div id="recipeOutput" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const DEMONS = {
+  "Pixie":{"lvl":2,"race":"Fairy","resists":"-w-s--","skills":{"Dia":0.1,"Charm":0.2,"Zio":4},"stats":[0,30,27,3,7,4,4]},
+  "Kobold":{"lvl":3,"race":"Touki","resists":"-w---w","skills":{"Aggravate":0.1,"Hero Aid":5},"stats":[0,48,12,4,3,5,7]},
+  "Kabuso":{"lvl":2,"race":"Beast","resists":"-s-w-s","skills":{"Agi":0.1,"Animal Leg":0.2,"Zan":4},"stats":[0,33,21,4,6,4,4]},
+  "Nekomata":{"lvl":19,"race":"Beast","resists":"---wd-","skills":{"+Paralyze":0.1,"Watchful":0.2,"Animal Leg":0.3,"Paral Eyes":21},"stats":[0,148,46,11,4,8,12]},
+  "Silky":{"lvl":24,"race":"Fairy","resists":"-wn--s","skills":{"Bufu":0.1,"Charm":0.2,"Media":26,"Mana Bonus":0},"stats":[0,155,133,9,14,9,8]},
+  "Jack Frost":{"lvl":14,"race":"Fairy","resists":"-wd---","skills":{"Bufu":0.1,"Mana Bonus":0.2,"Charm":0.3,"Ice Dance":15,"Anti-Curse":16},"stats":[0,132,52,7,10,8,5]},
+  "Pyro Jack":{"lvl":19,"race":"Fairy","resists":"-dw---","skills":{"Fire Dance":0.1,"Charm":0.2,"Maragi":21},"stats":[0,140,90,8,11,9,7]},
+  "Kijimunaa":{"lvl":8,"race":"Fairy","resists":"-w---s","skills":{"Zan":0.1,"Mana Bonus":0.2,"Charm":0.3},"stats":[0,60,46,6,6,4,8]},
+  "Kikimora":{"lvl":10,"race":"Femme","resists":"----wn","skills":{"Dia":0.1,"Devotion":0.2,"Zan":11,"Mana Bonus":12},"stats":[0,75,55,5,9,5,7]},
+  "Lilim":{"lvl":15,"race":"Femme","resists":"--wn--","skills":{"Mana Bonus":0.1,"Anti-Elec":0.2,"Devotion":0.3,"Elec Dance":16,"Mute Eyes":17},"stats":[0,116,68,7,10,7,7]},
+  "Bilwis":{"lvl":9,"race":"Touki","resists":"-sswn-","skills":{"Hero Aid":0.1,"Aggravate":0.2,"Race-D":10},"stats":[0,112,6,7,4,7,7]},
+  "Gozuki":{"lvl":16,"race":"Touki","resists":"-rw-sw","skills":{"Berserk":0.1,"Race-O":0.2,"Aggravate":0.3,"Desperation":18},"stats":[0,182,20,13,4,10,5]},
+  "Garm":{"lvl":11,"race":"Wilder","resists":"-sw-ws","skills":{"Agi":0.1,"Watchful":0.2,"Devil Speed":0.3,"Counter":14},"stats":[0,110,22,11,3,6,7]},
+  "Hairy Jack":{"lvl":10,"race":"Beast","resists":"s-sw--","skills":{"Anger Hit":0.1,"Animal Leg":0.2,"+Poison":12,"Life Bonus":13},"stats":[0,84,30,7,5,5,9]},
+  "Ogre":{"lvl":4,"race":"Jaki","resists":"-wsww-","skills":{"Knight Soul":0.1,"Bind":0.2},"stats":[0,72,8,9,4,5,2]},
+  "Ogun":{"lvl":8,"race":"Jaki","resists":"-sw--n","skills":{"Knight Soul":0.1,"Bind":0.2,"Anger Hit":9,"Life Bonus":10,"Agi":11},"stats":[0,104,11,10,3,5,6]},
+  "Heqet":{"lvl":9,"race":"Avatar","resists":"-wns-w","skills":{"Bufu":0.1,"Knight Soul":0.2,"Switch":0.3},"stats":[0,90,34,7,8,6,4]},
+  "Jambavan":{"lvl":9,"race":"Genma","resists":"--wws-","skills":{"Agi":0.1,"Knight Soul":0.2,"Phantasma":0.3,"Race-O":10},"stats":[0,136,12,10,3,9,3]},
+  "Sarasvati":{"lvl":12,"race":"Megami","resists":"-w---n","skills":{"Dia":0.1,"Anti-Force":0.2,"Affection":0.3,"Force Dance":14},"stats":[0,90,76,5,12,6,5]},
+  "Kikuri-Hime":{"lvl":21,"race":"Megami","resists":"-w---n","skills":{"Affection":0.1,"Media":22,"Recarm":23},"stats":[0,150,105,8,14,9,6]},
+  "Gagyson":{"lvl":12,"race":"Fallen","resists":"----w-","skills":{"Zio":0.1,"Life Bonus":0.2,"Sacrifice":0.3,"Elec Dance":13,"Counter":14},"stats":[0,125,40,7,8,7,6]},
+  "Waira":{"lvl":7,"race":"Wilder","resists":"-w---n","skills":{"Zan":0.1,"Devil Speed":0.2,"Hero Aid":8,"Life Bonus":9},"stats":[0,78,35,6,7,5,5]},
+  "Moh Shuvuu":{"lvl":7,"race":"Avian","resists":"---dws","skills":{"Bufu":0.1,"Flight":0.2},"stats":[0,72,27,6,5,5,7]},
+  "Thor":{"lvl":16,"race":"Deity","resists":"---d-w","skills":{"Awakening":0.1,"Elec Dance":17,"Counter":18},"stats":[1,175,24,17,3,11,1]},
+  "Angel":{"lvl":14,"race":"Divine","resists":"--s-ws","skills":{"Dia":0.1,"Blood Wine":0.2,"+Mute":15},"stats":[0,126,44,8,8,7,7]},
+  "Abaddon":{"lvl":40,"race":"Vile","resists":"wsssss","skills":{"Chaos Wave":0.1,"Bufudyne":41,"Null Ice":42,"Anti-Most":43},"stats":[0,270,168,15,16,14,11]},
+  "Hecate":{"lvl":42,"race":"Tyrant","resists":"-sssss","skills":{"Anti-Most":0.1,"Tyranny":0.2,"Mediarahan":43,"Pierce":44},"stats":[1,270,186,13,20,12,13]},
+  "King Frost":{"lvl":22,"race":"Tyrant","resists":"-wdssn","skills":{"Mabufu":0.1,"Tyranny":0.2,"Ice Boost":23},"stats":[1,180,64,13,10,8,7]},
+  "Lorelei":{"lvl":33,"race":"Fairy","resists":"---ssw","skills":{"Diarahan":0.1,"Watchful":0.2,"Charm":0.3,"Makajamaon":35},"stats":[0,200,153,8,18,7,16]},
+  "Orthrus":{"lvl":35,"race":"Beast","resists":"-dw-s-","skills":{"Fire Dance":0.1,"Animal Leg":0.2,"Pierce":36,"Fire Amp":37},"stats":[0,245,88,16,9,14,12]},
+  "Cerberus":{"lvl":53,"race":"Beast","resists":"srws--","skills":{"Maragidyne":0.1,"Animal Leg":0.2,"Hero Soul":54},"stats":[0,476,94,23,10,15,21]},
+  "Rangda":{"lvl":49,"race":"Femme","resists":"r--wss","skills":{"Devotion":0.1,"Diajama":50,"Phys Repel":51},"stats":[0,330,183,20,12,17,16]},
+  "Orobas":{"lvl":35,"race":"Fallen","resists":"--ws-n","skills":{"Mazio":0.1,"Null Curse":0.2,"Sacrifice":0.3,"Weak Kill":36,"Elec Amp":37},"stats":[0,253,148,10,18,11,12]},
+  "Decarabia":{"lvl":44,"race":"Fallen","resists":"ss-w--","skills":{"Agidyne":0.1,"Sacrifice":0.2,"Shield All":45},"stats":[0,313,161,16,16,11,15]},
+  "Vivian":{"lvl":45,"race":"Fairy","resists":"-s-ds-","skills":{"Drain":0.1,"Mana Surge":0.2,"Charm":0.3,"Ziodyne":46,"Elec Repel":47},"stats":[0,261,261,10,22,13,13]},
+  "Alp":{"lvl":17,"race":"Fairy","resists":"--n-ws","skills":{"Tarukaja":0.1,"Charm":0.2,"Dormina":18},"stats":[0,136,70,8,12,7,6]},
+  "Nue":{"lvl":20,"race":"Wilder","resists":"-sw---","skills":{"Poisma":0.1,"Devil Speed":0.2,"Mazio":21},"stats":[0,160,58,12,8,8,8]},
+  "Bicorn":{"lvl":5,"race":"Beast","resists":"-w----","skills":{"Agi":0.1,"Life Bonus":0.2},"stats":[0,55,18,5,4,4,5]},
+  "Cu Sith":{"lvl":13,"race":"Beast","resists":"-sw--s","skills":{"Zan":0.1,"Animal Leg":0.2,"Agi":14},"stats":[0,118,30,9,5,7,8]},
+  "Succubus":{"lvl":17,"race":"Femme","resists":"--ws--","skills":{"Charm":0.1,"Mana Bonus":0.2,"Elec Dance":18},"stats":[0,128,90,7,12,7,8]},
+  "Rakshasa":{"lvl":22,"race":"Jaki","resists":"-www--","skills":{"Berserk":0.1,"Life Bonus":0.2,"Phys Boost":23},"stats":[0,214,28,18,4,11,5]},
+  "Oni":{"lvl":15,"race":"Jaki","resists":"-sw--w","skills":{"Berserk":0.1,"Race-O":0.2,"Sukukaja":16},"stats":[0,152,22,13,4,9,4]}
+};
+
+const FUSION_TABLE = {
+  "Fairy+Beast":"Fairy","Fairy+Femme":"Fairy","Fairy+Jaki":"Beast","Fairy+Touki":"Femme","Fairy+Wilder":"Fairy","Fairy+Fallen":"Femme","Fairy+Megami":"Fairy","Fairy+Divine":"Fairy","Fairy+Avian":"Fairy","Fairy+Genma":"Fairy","Fairy+Avatar":"Fairy","Fairy+Fairy":null,
+  "Beast+Femme":"Fairy","Beast+Jaki":"Wilder","Beast+Touki":"Jaki","Beast+Wilder":"Beast","Beast+Fallen":"Jaki","Beast+Megami":"Fairy","Beast+Divine":"Fairy","Beast+Avian":"Beast","Beast+Genma":"Beast","Beast+Avatar":"Genma","Beast+Beast":null,
+  "Femme+Jaki":"Beast","Femme+Touki":"Femme","Femme+Wilder":"Femme","Femme+Fallen":"Femme","Femme+Megami":"Megami","Femme+Divine":"Megami","Femme+Avian":"Femme","Femme+Genma":"Femme","Femme+Avatar":"Femme","Femme+Femme":null,
+  "Jaki+Touki":"Jaki","Jaki+Wilder":"Jaki","Jaki+Fallen":"Fallen","Jaki+Megami":"Femme","Jaki+Divine":"Femme","Jaki+Avian":"Wilder","Jaki+Genma":"Genma","Jaki+Avatar":"Jaki","Jaki+Jaki":null,
+  "Touki+Wilder":"Touki","Touki+Fallen":"Touki","Touki+Megami":"Femme","Touki+Divine":"Femme","Touki+Avian":"Touki","Touki+Genma":"Touki","Touki+Avatar":"Avatar","Touki+Touki":null,
+  "Wilder+Fallen":"Wilder","Wilder+Megami":"Fairy","Wilder+Divine":"Fairy","Wilder+Avian":"Wilder","Wilder+Genma":"Genma","Wilder+Avatar":"Avatar","Wilder+Wilder":null,
+  "Fallen+Megami":"Femme","Fallen+Divine":"Femme","Fallen+Avian":"Fallen","Fallen+Genma":"Fallen","Fallen+Avatar":"Fallen","Fallen+Fallen":null,
+  "Megami+Divine":"Megami","Megami+Avian":"Megami","Megami+Genma":"Megami","Megami+Avatar":"Megami","Megami+Megami":null,
+  "Divine+Avian":"Divine","Divine+Genma":"Genma","Divine+Avatar":"Divine","Divine+Divine":null,
+  "Avian+Genma":"Avian","Avian+Avatar":"Avian","Avian+Avian":null,
+  "Genma+Avatar":"Genma","Genma+Genma":null,
+  "Avatar+Avatar":null
+};
+
+const CMD_SKILLS = new Set([
+  'Agi','Bufu','Zio','Zan','Maragi','Mabufu','Mazio','Mazan','Agidyne','Bufudyne','Ziodyne','Zandyne','Maragidyne',
+  'Dia','Media','Diarahan','Mediarahan','Recarm','Amrita','Tarukaja','Rakukaja','Sukukaja','Dekaja','Dekunda',
+  'Fire Dance','Ice Dance','Elec Dance','Force Dance','Berserk','Anger Hit','Race-D','Race-O','Switch','Sacrifice',
+  'Bind','Charm','+Paralyze','+Mute','+Poison','Dormina','Drain','Diajama','Gigajama','Makajamaon','Poisma',
+  'Blood Wine','Chaos Wave','Weak Kill','Shield All','Tyranny','Devotion','Affection','Desperation',
+  'Knight Soul','Phantasma','Mute Eyes','Paral Eyes'
+]);
+
+const ALL_SKILLS = [...new Set(
+  Object.values(DEMONS).flatMap(d=>Object.keys(d.skills)).concat([
+    'Agi','Bufu','Zio','Zan','Maragi','Mabufu','Mazio','Mazan','Agidyne','Bufudyne','Ziodyne','Zandyne','Maragidyne',
+    'Dia','Media','Diarahan','Mediarahan','Recarm','Amrita','Tarukaja','Rakukaja','Sukukaja','Dekaja','Dekunda',
+    'Fire Dance','Ice Dance','Elec Dance','Force Dance',
+    'Mana Bonus','Life Bonus','Mana Surge','Life Aid','Phys Boost','Fire Boost','Ice Boost','Elec Boost','Force Boost',
+    'Fire Amp','Ice Amp','Elec Amp','Force Amp','Pierce','Counter','Retaliate','Hero Aid','Hero Soul',
+    'Watchful','Aggravate','Animal Leg','Devil Speed','Flight','Awakening',
+    'Null Curse','Anti-Curse','Anti-Elec','Anti-Force','Elec Repel','Phys Repel'
+  ])
+)].sort();
+
+const RES_NAMES=['Phys','Fire','Ice','Elec','Force','Curse'];
+const RES_SHOW={'-':'Normal','w':'Weak','s':'Resist','n':'Null','d':'Drain','r':'Repel'};
+const RES_CLASS={'-':'normal','w':'weak','s':'resist','n':'special','d':'special','r':'special'};
+const STAT_LABELS=['Str','HP','MP','St','Ma','Vi','Ag'];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  sbTab:'owned',
+  owned:{},          // name -> {owned:bool, skills:[...up to 6]}
+  target:'',
+  desiredSkills:[],  // [{name,type}]
+  lastResult:null
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const isCmd = s => CMD_SKILLS.has(s);
+const skType = s => isCmd(s)?'cmd':'pas';
+const demonNames = Object.keys(DEMONS).sort((a,b)=>DEMONS[a].lvl-DEMONS[b].lvl);
+const getRace = n => DEMONS[n].race;
+const allSkillsOf = n => Object.keys(DEMONS[n].skills);
+
+function ensureOwned(name){
+  if(!S.owned[name]){
+    S.owned[name]={owned:false,skills:[...allSkillsOf(name)].slice(0,6)};
+  }
+  return S.owned[name];
+}
+function isOwned(name){ return ensureOwned(name).owned; }
+function ownedSkills(name){
+  const st=ensureOwned(name);
+  return st.skills.filter(s=>!!s);
+}
+function skillsForSolver(name){
+  // returns all skills this demon can contribute (owned skills or base skills)
+  if(isOwned(name)) return ownedSkills(name);
+  return allSkillsOf(name);
+}
+
+function getFusionRace(rA,rB){
+  const k1=`${rA}+${rB}`,k2=`${rB}+${rA}`;
+  if(k1 in FUSION_TABLE) return FUSION_TABLE[k1];
+  if(k2 in FUSION_TABLE) return FUSION_TABLE[k2];
+  return undefined;
+}
+
+// Find all (raceA, raceB) pairs that produce targetRace
+function parentRacePairs(targetRace){
+  const pairs=[];
+  const races=[...new Set(Object.values(DEMONS).map(d=>d.race))];
+  for(let i=0;i<races.length;i++){
+    for(let j=i;j<races.length;j++){
+      const r=getFusionRace(races[i],races[j]);
+      if(r===targetRace) pairs.push([races[i],races[j]]);
+    }
+  }
+  return pairs;
+}
+
+// Given two parents, predict result name using level-average lookup
+function predictResult(nameA,nameB){
+  const dA=DEMONS[nameA],dB=DEMONS[nameB];
+  const race=getFusionRace(dA.race,dB.race);
+  if(!race) return null;
+  const avg=Math.floor((dA.lvl+dB.lvl)/2);
+  const cands=Object.entries(DEMONS)
+    .filter(([n,d])=>d.race===race&&n!==nameA&&n!==nameB)
+    .sort(([,a],[,b])=>a.lvl-b.lvl);
+  let best=null;
+  for(const [n,d] of cands){ if(d.lvl>=avg){best=n;break;} }
+  if(!best&&cands.length) best=cands[cands.length-1][0];
+  return best;
+}
+
+// ─── SOLVER ──────────────────────────────────────────────────────────────────
+// Returns {ok, steps, missing, reasons}
+function solve(targetName, desiredSkills, strict){
+  const reasons=[];
+  const td=DEMONS[targetName];
+  if(!td){ return {ok:false,reasons:['Target demon not found in dataset.']}; }
+
+  const targetRace=td.race;
+  const ownedSet=new Set(Object.keys(S.owned).filter(n=>S.owned[n]&&S.owned[n].owned));
+
+  // All skills innate to the target
+  const targetInnate=new Set(allSkillsOf(targetName));
+  // Desired skills that are NOT innate (need to be carried in)
+  const toInherit=desiredSkills.filter(s=>!targetInnate.has(s));
+  const alreadyHave=desiredSkills.filter(s=>targetInnate.has(s));
+
+  // Find parent race pairs that produce targetRace
+  const pairs=parentRacePairs(targetRace);
+  if(!pairs.length){
+    reasons.push(`No race combination in the current table produces the ${targetRace} race.`);
+    reasons.push('The dataset may be incomplete. This race might only be reachable via special fusion.');
+    return {ok:false,reasons};
+  }
+
+  // For each desired inherited skill, check if ANY demon in the dataset has it
+  const skillDemonMap={}; // skill -> [demonNames that have it]
+  for(const sk of toInherit){
+    skillDemonMap[sk]=Object.keys(DEMONS).filter(n=>allSkillsOf(n).includes(sk));
+    if(!skillDemonMap[sk].length){
+      reasons.push(`"${sk}" is not found on any demon in the current dataset — cannot inherit.`);
+    }
+  }
+
+  // Separate CMD/PAS for slot cap check
+  const wantCmd=desiredSkills.filter(isCmd);
+  const wantPas=desiredSkills.filter(s=>!isCmd(s));
+  if(wantCmd.length>3) reasons.push(`You selected ${wantCmd.length} command skills but only 3 command slots exist.`);
+  if(wantPas.length>3) reasons.push(`You selected ${wantPas.length} passive skills but only 3 passive slots exist.`);
+
+  if(strict && reasons.length) return {ok:false,reasons};
+
+  // Try to find a good single-step recipe:
+  // Two parents whose combined skills cover as many desired inherited skills as possible
+  // Preference: at least one parent is owned
+  let bestPlan=null;
+  let bestScore=-1;
+
+  for(const [rA,rB] of pairs){
+    const demonsA=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rA&&n!==targetName);
+    const demonsB=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rB&&n!==targetName);
+
+    for(const pA of demonsA){
+      for(const pB of demonsB){
+        if(pA===pB) continue;
+        const predicted=predictResult(pA,pB);
+        if(!predicted || predicted!==targetName) continue; // must resolve to target
+
+        const poolSkills=[...new Set([...skillsForSolver(pA),...skillsForSolver(pB)])];
+        const covered=toInherit.filter(s=>poolSkills.includes(s));
+        const missing=toInherit.filter(s=>!poolSkills.includes(s));
+
+        if(strict && missing.length) continue; // skip plans with any gap in strict mode
+
+        let score=covered.length*10;
+        // bonus for owned parents
+        if(ownedSet.has(pA)) score+=3;
+        if(ownedSet.has(pB)) score+=3;
+        // prefer fewer needed fusions (shorter chain = lower combined lvl)
+        score -= (DEMONS[pA].lvl+DEMONS[pB].lvl)/100;
+
+        if(score>bestScore){
+          bestScore=score;
+          bestPlan={pA,pB,predicted,poolSkills,covered,missing,rA,rB};
+        }
+      }
+    }
+  }
+
+  // If strict and no plan found, build detailed reasons
+  if(strict && !bestPlan){
+    if(!reasons.length){
+      // Check if the target demon itself can even be produced by any pair
+      let anyPair=false;
+      for(const [rA,rB] of pairs){
+        const da=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rA&&n!==targetName);
+        const db=Object.keys(DEMONS).filter(n=>DEMONS[n].race===rB&&n!==targetName);
+        for(const a of da) for(const b of db){
+          if(a!==b && predictResult(a,b)===targetName){anyPair=true;break;}
+          if(anyPair) break;
+        }
+        if(anyPair) break;
+      }
+      if(!anyPair){
+        reasons.push(`No combination of demons in the dataset fuses into ${targetName} via level-average rules.`);
+        reasons.push('The compendium data is incomplete — this target may require fusion data not yet entered.');
+      } else {
+        reasons.push(`No parent pair found that can carry ALL desired skills into ${targetName} simultaneously.`);
+        for(const sk of toInherit){
+          const carriers=skillDemonMap[sk]||[];
+          if(!carriers.length) reasons.push(`  • "${sk}": no demon in the dataset has this skill.`);
+          else reasons.push(`  • "${sk}": only on ${carriers.slice(0,4).join(', ')}${carriers.length>4?' and others':''} — check if any can be a parent for ${targetName}.`);
+        }
+        reasons.push('Switch to Best Effort to see the closest partial solution.');
+      }
+    }
+    return {ok:false,reasons};
+  }
+
+  if(!bestPlan){
+    reasons.push(`No parent pair in the dataset resolves to ${targetName} via level-average rules.`);
+    reasons.push('The compendium is incomplete — add more demons or try a different target.');
+    return {ok:false,reasons};
+  }
+
+  // Build step objects
+  const steps=[{
+    pA:bestPlan.pA,
+    pB:bestPlan.pB,
+    result:targetName,
+    inheritedPool:bestPlan.poolSkills,
+    coveredDesired:bestPlan.covered,
+    missing:bestPlan.missing
+  }];
+
+  const missingSkills=bestPlan.missing;
+  return {
+    ok: missingSkills.length===0,
+    partial: missingSkills.length>0,
+    steps,
+    alreadyHave,
+    missing: missingSkills,
+    reasons
+  };
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+function sbTab(t){
+  S.sbTab=t;
+  document.getElementById('tabOwned').className='sb-tab'+(t==='owned'?' active':'');
+  document.getElementById('tabAll').className='sb-tab'+(t==='all'?' active':'');
+  renderSidebar();
+}
+function renderSidebar(){
+  const q=(document.getElementById('sbSearch').value||'').toLowerCase();
+  const race=document.getElementById('sbRace').value||'';
+  let names=demonNames.filter(n=>{
+    if(!n.toLowerCase().includes(q)) return false;
+    if(race && DEMONS[n].race!==race) return false;
+    if(S.sbTab==='owned' && !isOwned(n)) return false;
+    return true;
+  });
+  const list=document.getElementById('demonList');
+  if(!names.length){
+    list.innerHTML=`<div class="empty">${S.sbTab==='owned'?'No owned demons yet. Click ★ in All Demons.':'No demons match.'}</div>`;
+    return;
+  }
+  list.innerHTML=names.map(n=>{
+    const d=DEMONS[n],owned=isOwned(n);
+    return `<div class="demon-row" onclick="openOwnedEditor('${esc(n)}')">
+      <span class="star ${owned?'on':''}" onclick="event.stopPropagation();toggleOwned('${esc(n)}')" title="${owned?'Remove from owned':'Mark as owned'}">★</span>
+      <div class="d-meta"><div class="d-name">${n}</div><div class="d-sub">Lv${d.lvl} · ${d.race}</div></div>
+      ${owned?'<span class="badge good">Owned</span>':''}
+    </div>`;
+  }).join('');
+}
+function toggleOwned(name){
+  const st=ensureOwned(name);st.owned=!st.owned;
+  renderSidebar();populateTargetSelect();
+  toast(st.owned?`${name} marked as owned`:`${name} removed from owned`);
+}
+function openOwnedEditor(name){
+  // For now: toggle owned and open skill editor inline
+  // A proper modal would be added next iteration
+  toggleOwned(name);
+}
+
+// ─── TARGET SELECT ────────────────────────────────────────────────────────────
+function populateTargetSelect(){
+  const sel=document.getElementById('targetSelect');
+  const cur=S.target;
+  sel.innerHTML='<option value="">— Choose target —</option>';
+  demonNames.forEach(n=>{
+    const d=DEMONS[n],owned=isOwned(n);
+    const o=document.createElement('option');
+    o.value=n;
+    o.textContent=`${n} (Lv${d.lvl} ${d.race})${owned?' ★':''}`;
+    sel.appendChild(o);
+  });
+  if(cur) sel.value=cur;
+}
+function onTargetChange(){
+  S.target=document.getElementById('targetSelect').value;
+  S.desiredSkills=[];
+  renderTargetPanel();
+}
+function renderTargetPanel(){
+  const name=S.target;
+  document.getElementById('skillSelector').style.display=name?'block':'none';
+  if(!name){document.getElementById('targetCard').innerHTML='';return;}
+  renderSkillSelector();
+  document.getElementById('targetCard').innerHTML=demonCard(name,[],[],'Target');
+}
+function resetTarget(){
+  S.target='';S.desiredSkills=[];S.lastResult=null;
+  document.getElementById('targetSelect').value='';
+  document.getElementById('recipeOutput').innerHTML='';
+  renderTargetPanel();
+}
+
+// ─── SKILL SELECTOR ───────────────────────────────────────────────────────────
+function renderSkillSelector(){
+  const name=S.target;
+  if(!name) return;
+  const innate=new Set(allSkillsOf(name));
+  const sel=new Set(S.desiredSkills);
+  const cmdSel=S.desiredSkills.filter(isCmd).length;
+  const pasSel=S.desiredSkills.filter(s=>!isCmd(s)).length;
+  document.getElementById('cmdCount').textContent=cmdSel;
+  document.getElementById('pasCount').textContent=pasSel;
+
+  function poolRow(skill){
+    const selected=sel.has(skill);
+    const type=skType(skill);
+    const fromInnate=innate.has(skill);
+    const carriers=Object.keys(DEMONS).filter(n=>allSkillsOf(n).includes(skill)&&n!==name);
+    const hint=fromInnate?'Innate on target':carriers.length?`On: ${carriers.slice(0,3).join(', ')}${carriers.length>3?'…':''}`:'Not found in dataset';
+    return `<div class="skill-row ${selected?'selected':''}" onclick="toggleDesired('${esc(skill)}','${type}')">
+      <div>
+        <div class="skill-name">${skill}${fromInnate?' <span style="color:var(--good);font-size:.68rem">(innate)</span>':''}</div>
+        <div class="skill-source">${hint}</div>
+      </div>
+      <span class="badge ${selected?'good':''}">  ${selected?'✓ selected':'+ add'}</span>
+    </div>`;
+  }
+
+  // Show all skills, but prioritise: innate first, then those that exist on other demons
+  const cmdPool=ALL_SKILLS.filter(isCmd);
+  const pasPool=ALL_SKILLS.filter(s=>!isCmd(s));
+  document.getElementById('cmdPool').innerHTML=cmdPool.map(poolRow).join('');
+  document.getElementById('pasPool').innerHTML=pasPool.map(poolRow).join('');
+
+  const stripEl=document.getElementById('selectedSkills');
+  if(!S.desiredSkills.length){
+    stripEl.innerHTML='<span style="color:var(--muted);font-size:.78rem">None selected</span>';
+  } else {
+    stripEl.innerHTML=S.desiredSkills.map(s=>`<span class="slot-pill ${skType(s)}" onclick="removeDesired('${esc(s)}')" title="Remove">${s} ✕</span>`).join('');
+  }
+}
+function toggleDesired(skill,type){
+  const idx=S.desiredSkills.indexOf(skill);
+  if(idx>-1){S.desiredSkills.splice(idx,1);}
+  else{
+    const count=S.desiredSkills.filter(s=>skType(s)===type).length;
+    if(count>=3){toast(`Only 3 ${type.toUpperCase()} slots available`);return;}
+    S.desiredSkills.push(skill);
+  }
+  renderSkillSelector();
+}
+function removeDesired(skill){
+  S.desiredSkills=S.desiredSkills.filter(s=>s!==skill);
+  renderSkillSelector();
+}
+
+// ─── GENERATE ────────────────────────────────────────────────────────────────
+function generateRecipe(){
+  if(!S.target){toast('Pick a target demon first');return;}
+  const strict=document.getElementById('strictToggle').checked;
+  const result=solve(S.target,S.desiredSkills,strict);
+  S.lastResult=result;
+  renderRecipeOutput(result,strict);
+}
+function renderRecipeOutput(result,strict){
+  const out=document.getElementById('recipeOutput');
+  if(!result.ok && !result.partial){
+    out.innerHTML=failurePanel(result.reasons);
+    return;
+  }
+  const step=result.steps[0];
+  const targetSkillsFinal=[
+    ...result.alreadyHave,
+    ...result.steps[0].coveredDesired
+  ];
+
+  let html='';
+
+  // Partial warning in best-effort
+  if(result.partial){
+    html+=`<div class="failure-panel" style="border-color:#3e3112;background:#191108;margin-bottom:12px">
+      <div class="failure-title" style="color:var(--warn)">⚠ Best Effort — some skills could not be covered</div>
+      <div class="failure-reasons">${result.missing.map(s=>`<div class="failure-reason" style="border-color:var(--warn)">
+        <b>${s}</b>: no parent demon in this dataset has this skill, or it cannot be carried into ${S.target} with the current data.
+      </div>`).join('')}</div>
+    </div>`;
+  }
+
+  html+=`<div class="result-panel">
+    <div class="result-head">
+      <span class="result-title">${step.pA} × ${step.pB} → ${step.result}</span>
+      ${isOwned(step.pA)?'<span class="badge good">'+step.pA+' owned</span>':''}
+      ${isOwned(step.pB)?'<span class="badge good">'+step.pB+' owned</span>':''}
+    </div>
+    <div class="result-body">
+      <div class="grid2">
+        ${demonCard(step.pA,skillsForSolver(step.pA),result.steps[0].coveredDesired,'Parent A')}
+        ${demonCard(step.pB,skillsForSolver(step.pB),result.steps[0].coveredDesired,'Parent B')}
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:6px">Result — ${step.result}</div>
+        ${demonCard(step.result,targetSkillsFinal,S.desiredSkills,'Result',true)}
+      </div>
+      <div class="note">
+        <b>Inherited skill pool</b> (from both parents): ${step.inheritedPool.join(', ')||'none'}.<br/>
+        Skills marked <span style="color:var(--accent)">Wanted</span> are your desired skills.
+        Skills marked <span style="color:var(--good)">Innate</span> are guaranteed. Inherited skills depend on slot luck (~75% per slot).
+      </div>
+    </div>
+  </div>`;
+
+  out.innerHTML=html;
+}
+function failurePanel(reasons){
+  return `<div class="failure-panel">
+    <div class="failure-title">✕ No valid recipe found</div>
+    <div class="failure-reasons">${reasons.map(r=>`<div class="failure-reason">${r}</div>`).join('')}</div>
+  </div>`;
+}
+
+// ─── DEMON CARD ───────────────────────────────────────────────────────────────
+function demonCard(name,highlightSkills=[],wantedSkills=[],label='',open=false){
+  const d=DEMONS[name];if(!d) return '';
+  const innate=new Set(allSkillsOf(name));
+  const highlightSet=new Set(highlightSkills);
+  const wantedSet=new Set(wantedSkills);
+  const id='dc-'+Math.random().toString(36).slice(2);
+
+  const stats=STAT_LABELS.map((l,i)=>`<div class="stat-chip"><span>${l}</span>${d.stats[i]}</div>`).join('');
+  const res=d.resists.split('').map((c,i)=>{
+    return `<div class="res-chip ${RES_CLASS[c]||'normal'}"><span>${RES_NAMES[i]}</span><strong>${RES_SHOW[c]||'—'}</strong></div>`;
+  }).join('');
+
+  // Build final 3+3 skill display
+  const allForCard=[...new Set([...allSkillsOf(name),...highlightSkills])];
+  const cmdSkills=allForCard.filter(isCmd).slice(0,3);
+  const pasSkills=allForCard.filter(s=>!isCmd(s)).slice(0,3);
+
+  function skSlot(skill,type){
+    if(!skill) return `<div class="sk-slot empty">Empty ${type} slot</div>`;
+    const isInn=innate.has(skill);
+    const isWanted=wantedSet.has(skill);
+    const isHighlighted=highlightSet.has(skill)&&!isInn;
+    let pillClass=isWanted?'wanted':type;
+    let pillLabel=isWanted?'WANTED':(isInn?'INNATE':type.toUpperCase());
+    return `<div class="sk-slot">
+      <span class="sk-pill ${pillClass}">${pillLabel}</span>
+      <span>${skill}</span>
+      ${isInn?'<span class="sk-right" style="color:var(--good)">guaranteed</span>':
+        isHighlighted?'<span class="sk-right">from parent</span>':''}
+    </div>`;
+  }
+
+  const cmdHtml=[0,1,2].map(i=>skSlot(cmdSkills[i],'cmd')).join('');
+  const pasHtml=[0,1,2].map(i=>skSlot(pasSkills[i],'pas')).join('');
+
+  return `<div class="demon-card">
+    <div class="demon-card-head" onclick="document.getElementById('${id}').classList.toggle('open')">
+      ${label?`<span class="badge">${label}</span>`:''}
+      <span class="dc-title">${name}</span>
+      <span class="badge">Lv${d.lvl}</span>
+      <span class="badge">${d.race}</span>
+      ${isOwned(name)?'<span class="badge good">Owned</span>':''}
+    </div>
+    <div id="${id}" class="demon-card-body ${open?'open':''}">
+      <div class="stats-row">${stats}</div>
+      <div class="resists-grid">${res}</div>
+      <div class="skills-split">
+        <div class="sk-box"><div class="sk-head cmd">Command (3 slots)</div><div class="sk-body">${cmdHtml}</div></div>
+        <div class="sk-box"><div class="sk-head pas">Passive (3 slots)</div><div class="sk-body">${pasHtml}</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ─── COPY ─────────────────────────────────────────────────────────────────────
+function copyResult(){
+  if(!S.lastResult||!S.lastResult.steps){
+    toast('Generate a recipe first');return;
+  }
+  const step=S.lastResult.steps[0];
+  let t=`Fusion Recipe — ${S.target}\n`;
+  t+=`${step.pA} × ${step.pB} → ${step.result}\n`;
+  if(S.desiredSkills.length) t+=`Desired skills: ${S.desiredSkills.join(', ')}\n`;
+  if(S.lastResult.missing&&S.lastResult.missing.length) t+=`Could not cover: ${S.lastResult.missing.join(', ')}\n`;
+  t+=`Inherited skill pool: ${step.inheritedPool.join(', ')||'none'}`;
+  navigator.clipboard.writeText(t).then(()=>toast('Copied!')).catch(()=>toast('Copy failed'));
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init(){
+  const races=[...new Set(Object.values(DEMONS).map(d=>d.race))].sort();
+  const rf=document.getElementById('sbRace');
+  races.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;rf.appendChild(o);});
+  Object.keys(DEMONS).forEach(ensureOwned);
+  populateTargetSelect();
+  renderSidebar();
+}
+init();
+</script>
+</body>
+</html>

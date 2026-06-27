@@ -19,7 +19,7 @@ export class Compendium implements ICompendium {
   private _allDemons: Demon[];
   private _allSkills: Skill[];
 
-  constructor(private compConfig: CompendiumConfig, demonToggles: Toggles) {
+  constructor(public compConfig: CompendiumConfig, demonToggles: Toggles) {
     this.initImportedData();
     this.updateDerivedData(demonToggles);
   }
@@ -105,6 +105,7 @@ export class Compendium implements ICompendium {
           affinities: json['affinities'],
           fusion:     json['fusion'] || 'normal',
           prereq:     json['prereq'] || '',
+          auctions:   json['auctions'],
           searchTags: [name, race].join(',').toLocaleLowerCase()
         }
 

@@ -1,12 +1,15 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 
-import { CompendiumRoutingModule } from '../smt4f/compendium-routing.module';
+import { DesuCompendiumRoutingModule } from './compendium-routing.module';
 import { FusionDataService } from '../smt4f/fusion-data.service';
+import { SkillFusionGeneratorComponent } from './components/skill-fusion-generator.component';
 
 import { COMPENDIUM_CONFIG, FUSION_DATA_SERVICE } from '../compendium/constants';
 import { Smt4CompendiumModule } from '../smt4f/smt4-compendium.module';
+import { SharedCompendiumModule } from '../compendium/compendium.module';
 import { CompendiumConfig, CompendiumConfigSet } from '../smt4f/models';
 import { skillRowToEffect } from '../pq2/models/skill-importer';
 
@@ -31,7 +34,7 @@ function estimateDesuPrice(demon, statPrices: number[], skillPrices: { [skill: s
   return statPrice + skillPrice + (demon.race === 'Element' ? 1000 : demon.race === 'Mitama' ? 3000 : 0);
 }
 
-function createCompConfig(): CompendiumConfigSet {
+export function createCompConfig(): CompendiumConfigSet {
   const races = COMP_CONFIG_JSON.races;
   const resistElems = COMP_CONFIG_JSON.resistElems;
   const skillElems = resistElems.concat(COMP_CONFIG_JSON.skillElems);
@@ -142,8 +145,13 @@ const SMT_COMP_CONFIG = createCompConfig();
 @NgModule({
   imports: [
     CommonModule,
+    FormsModule,
     Smt4CompendiumModule,
-    CompendiumRoutingModule
+    SharedCompendiumModule,
+    DesuCompendiumRoutingModule
+  ],
+  declarations: [
+    SkillFusionGeneratorComponent
   ],
   providers: [
     Title,

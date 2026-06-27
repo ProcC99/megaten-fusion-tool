@@ -10,47 +10,45 @@ import Translations from '../data/translations.json';
   selector: 'app-demon-compendium-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <table *ngIf="3 + otherLinks.length + (hasSettings ? 1 : 0); let hlength"
-      [ngStyle]="{ marginLeft: 'auto', marginRight: 'auto', width: '1080px' }">
-      <thead>
-        <tr>
-          <th class="nav" routerLinkActive="active"
-            [routerLink]="mainList + 's'"
-            [routerLinkActiveOptions]="{ exact: true }"
-            [style.width.%]="1 / hlength">
-            <a [routerLink]="mainList + 's'">
-              {{ (mainList === 'demon' ? msgs.DemonList : msgs.PersonaList) | translateComp:lang }}
-            </a>
-          </th>
-          <th class="nav" routerLink="skills" routerLinkActive="active" [style.width.%]="1 / hlength">
-            <a routerLink="skills">
-              {{ msgs.SkillList | translateComp:lang }}
-            </a>
-          </th>
-          <th class="nav" routerLink="chart" routerLinkActive="active" [style.width.%]="1 / hlength">
-            <a routerLink="chart">
-              {{ msgs.FusionChart | translateComp:lang }}
-            </a>
-          </th>
-          <th *ngFor="let l of otherLinks" class="nav" routerLinkActive="active"
-            [routerLink]="l.link"
-            [routerLinkActiveOptions]="{ exact: true }"
-            [style.width.%]="1 / hlength">
-            <a [routerLink]="l.link">
-              {{ l.title }}
-            </a>
-          </th>
-          <th *ngIf="hasSettings" class="nav" routerLink="settings" routerLinkActive="active" [style.width.%]="1 / hlength">
-            <a routerLink="settings">
-              {{ msgs.FusionSettings | translateComp:lang }}
-            </a>
-          </th>
-        </tr>
-        <tr>
-          <th [attr.colspan]="hlength" class="title">{{ appName }}{{ msgs.FusionCalculator | translateComp:lang }}</th>
-        </tr>
-      </thead>
-    </table>
+    <div *ngIf="3 + otherLinks.length + (hasSettings ? 1 : 0); let hlength"
+      style="margin-left: auto; margin-right: auto; width: 100%; max-width: 1080px; display: flex; flex-direction: column;">
+      <div style="display: flex; flex-wrap: wrap; width: 100%;">
+        <div class="nav" routerLinkActive="active"
+          [routerLink]="mainList + 's'"
+          [routerLinkActiveOptions]="{ exact: true }"
+          style="flex: 1 1 120px; text-align: center; cursor: pointer; border: 1px solid #333; background-color: #1b1b1b; padding: 8px 4px;">
+          <a [routerLink]="mainList + 's'">
+            {{ (mainList === 'demon' ? msgs.DemonList : msgs.PersonaList) | translateComp:lang }}
+          </a>
+        </div>
+        <div class="nav" routerLink="skills" routerLinkActive="active" style="flex: 1 1 120px; text-align: center; cursor: pointer; border: 1px solid #333; background-color: #1b1b1b; padding: 8px 4px;">
+          <a routerLink="skills">
+            {{ msgs.SkillList | translateComp:lang }}
+          </a>
+        </div>
+        <div class="nav" routerLink="chart" routerLinkActive="active" style="flex: 1 1 120px; text-align: center; cursor: pointer; border: 1px solid #333; background-color: #1b1b1b; padding: 8px 4px;">
+          <a routerLink="chart">
+            {{ msgs.FusionChart | translateComp:lang }}
+          </a>
+        </div>
+        <div *ngFor="let l of otherLinks" class="nav" routerLinkActive="active"
+          [routerLink]="l.link"
+          [routerLinkActiveOptions]="{ exact: true }"
+          style="flex: 1 1 120px; text-align: center; cursor: pointer; border: 1px solid #333; background-color: #1b1b1b; padding: 8px 4px;">
+          <a [routerLink]="l.link">
+            {{ l.title }}
+          </a>
+        </div>
+        <div *ngIf="hasSettings" class="nav" routerLink="settings" routerLinkActive="active" style="flex: 1 1 120px; text-align: center; cursor: pointer; border: 1px solid #333; background-color: #1b1b1b; padding: 8px 4px;">
+          <a routerLink="settings">
+            {{ msgs.FusionSettings | translateComp:lang }}
+          </a>
+        </div>
+      </div>
+      <div class="title" style="width: 100%; text-align: center; background-color: #E53935; color: white; font-weight: bold; padding: 6px 0; border: 1px solid #333;">
+        {{ appName }}{{ msgs.FusionCalculator | translateComp:lang }}
+      </div>
+    </div>
   `,
 })
 export class CompendiumHeaderComponent {
@@ -67,7 +65,7 @@ export class CompendiumHeaderComponent {
   providers: [PositionEdgesService],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div [ngStyle]="{ marginLeft: 'auto', marginRight: 'auto', width: isChart ? 'auto' : '1080px' }">
+    <div [ngStyle]="{ marginLeft: 'auto', marginRight: 'auto', width: '100%', maxWidth: isChart ? 'none' : '1080px' }">
       <div *ngIf="!isChart" appPositionSticky>
         <app-demon-compendium-header appPositionSticky
           [appName]="appName"
